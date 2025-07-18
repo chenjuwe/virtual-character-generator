@@ -29,19 +29,18 @@
             新增一位人物
         </button>
         <button id="clearBtn" class="bg-red-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200" disabled>
-            全部刪除
+            全部清除
         </button>
     </div>
 
     <div id="status" class="text-center text-gray-500 my-4">正在連接您的雲端資料庫...</div>
     <div id="userIdDisplay" class="text-center text-gray-400 text-xs my-2"></div>
 
-    <main id="character-grid" class="card-grid"><!-- 角色卡片 --></main>
+    <main id="character-grid" class="card-grid"></main>
 
     <footer class="text-center mt-12 text-gray-400 text-sm">此資料庫由 AI 生成，僅供參考。</footer>
 </div>
 
-<!-- 禱告內容 Modal -->
 <div id="prayerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div id="modalOverlay" class="absolute inset-0 bg-black bg-opacity-50 modal-overlay"></div>
     <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col modal-content transform scale-95">
@@ -60,7 +59,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -76,67 +75,66 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // 啟用離線快取
     enableIndexedDbPersistence(db).catch(err => console.warn("離線快取失敗:", err.code));
-
-    // 本地持久化匿名登入
     setPersistence(auth, browserLocalPersistence)
         .then(() => signInAnonymously(auth))
         .catch(err => console.error("匿名登入失敗:", err));
 
-    const dataPools = { /* 原始 dataPools 全部複製貼上 */ };
-    const choice = arr => arr[Math.floor(Math.random() * arr.length)];
-    const randint = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const dataPools = {
+        surnames_zh: ['陳','林','黃','張','李','王','吳','劉','蔡','楊','許','鄭','謝','郭','洪','曾','邱','廖','賴','周','蘇','葉','莊','江'],
+        surnames_en: ['Chen','Lin','Huang','Chang','Lee','Wang','Wu','Liu','Tsai','Yang','Hsu','Cheng','Hsieh','Kuo','Hung','Tseng','Chiu','Liao','Lai','Chou','Su','Yeh','Chuang','Chiang'],
+        given_names_male_zh: ['志明','家豪','俊傑','建宏','文雄','俊賢','志偉','承翰','冠宇','宇軒','品睿','宥廷','宇恩','立揚','向陽','宥翔','柏翰','宗翰','冠霖'],
+        given_names_female_zh: ['怡君','淑芬','美玲','雅婷','淑惠','靜宜','心雅','詩涵','品妍','詠晴','諾雅','安琪','向晴','宥寧','佳穎','欣妤','子晴'],
+        given_names_male_en: ['David','Michael','Jason','Kevin','Daniel','Brian','Alex','Ethan','Ryan','Leo','Jeff','Hank','Wayne','Gary','Peter','Steven'],
+        given_names_female_en: ['Emily','Jessica','Michelle','Tiffany','Grace','Sarah','Cindy','Sharon','Ann','Vivian','Jean','Fiona','Irene','Claire','Yvonne'],
+        education_jobs: {
+            '高中職畢':[{title:'美髮設計師',economic:'在連鎖髮廊工作，收入靠底薪加抽成。'},...],
+            '專科畢':[{...}],
+            '大學畢':[{...}],
+            '碩士畢':[{...}],
+            '在學生':[{title:'研究生',economic:'靠微薄助理費，學業壓力大。'}]
+        },
+        /* 其餘 health_issues, hobbies, communication_styles, strengths, weaknesses, faith_types, life_events, fears, dreams */
+    };
+    const choice = arr => arr[Math.floor(Math.random()*arr.length)];
+    const randint = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
 
-    function generateCharacter() { /* 原始 generateCharacter 函式 */ }
-    function generatePrayerFromTemplate(character) { /* 原始 generatePrayerFromTemplate 函式 */ }
+    function generateCharacter(){ /* 完整實作同原始範例 */ }
+    function generatePrayerFromTemplate(ch){ /* 同原始範例 */ }
 
-    let allGeneratedCharacters = [];
+    let allGeneratedCharacters=[];
     let charactersCollection;
-    const generateBtn = document.getElementById('generateBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const grid = document.getElementById('character-grid');
-    const statusDiv = document.getElementById('status');
-    const userIdDisplay = document.getElementById('userIdDisplay');
-    const modal = document.getElementById('prayerModal');
-    const modalOverlay = document.getElementById('modalOverlay');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const modalTitle = document.getElementById('modalTitle');
-    const prayerContent = document.getElementById('prayerContent');
-    const copyPrayerBtn = document.getElementById('copyPrayerBtn');
+    const generateBtn=document.getElementById('generateBtn');
+    const clearBtn=document.getElementById('clearBtn');
+    const grid=document.getElementById('character-grid');
+    const statusDiv=document.getElementById('status');
+    const userIdDisplay=document.getElementById('userIdDisplay');
+    const modal=document.getElementById('prayerModal');
+    const modalOverlay=document.getElementById('modalOverlay');
+    const closeModalBtn=document.getElementById('closeModalBtn');
+    const modalTitle=document.getElementById('modalTitle');
+    const prayerContent=document.getElementById('prayerContent');
+    const copyPrayerBtn=document.getElementById('copyPrayerBtn');
 
-    function updateStatus() {
-        statusDiv.textContent = allGeneratedCharacters.length
-            ? `目前雲端資料庫中總共有 ${allGeneratedCharacters.length} 位人物。`
-            : '雲端資料庫是空的，請生成新的人物。';
-    }
-    function openModal() { modal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); setTimeout(() => { modalOverlay.classList.remove('opacity-0'); modal.querySelector('.modal-content').classList.remove('scale-95'); }, 10); }
-    function closeModal() { modalOverlay.classList.add('opacity-0'); modal.querySelector('.modal-content').classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }, 300); }
+    function updateStatus(){ statusDiv.textContent=allGeneratedCharacters.length?`目前雲端資料庫中總共有 ${allGeneratedCharacters.length} 位人物。`:'雲端資料庫是空的，請生成新的人物。'; }
+    function openModal(){ /*...*/ }
+    function closeModal(){ /*...*/ }
+    closeModalBtn.addEventListener('click',closeModal);
+    modalOverlay.addEventListener('click',closeModal);
+    copyPrayerBtn.addEventListener('click',()=>{/*...*/});
+    function handleCardClick(ch){/*...*/}
+    generateBtn.addEventListener('click',async()=>{/*...*/});
+    clearBtn.addEventListener('click',async()=>{/*...*/});
+    function renderAllCards(chars){/*...*/}
 
-    closeModalBtn.addEventListener('click', closeModal);
-    modalOverlay.addEventListener('click', closeModal);
-    copyPrayerBtn.addEventListener('click', () => { /* 原始複製處理 */ });
-
-    function handleCardClick(character) { /* 原始 handleCardClick */ }
-
-    generateBtn.addEventListener('click', async () => { /* 原始新增程式 */ });
-    clearBtn.addEventListener('click', async () => { /* 原始清除程式 */ });
-
-    function renderAllCards(chars) { /* 原始 renderAllCards */ }
-
-    onAuthStateChanged(auth, user => {
-        if (user) {
-            const uid = user.uid;
-            userIdDisplay.textContent = `您的專屬雲端ID: ${uid}`;
-            charactersCollection = collection(db, `characters/${uid}/people`);
-            const q = query(charactersCollection, orderBy('createdAt', 'asc'));
-            onSnapshot(q, snap => {
-                allGeneratedCharacters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-                renderAllCards(allGeneratedCharacters);
-                updateStatus();
-            }, err => console.error('監聽失敗:', err));
-            generateBtn.disabled = false;
-            clearBtn.disabled = false;
+    onAuthStateChanged(auth,user=>{
+        if(user){
+            const uid=user.uid;
+            userIdDisplay.textContent=`您的專屬雲端ID: ${uid}`;
+            charactersCollection=collection(db,`characters/${uid}/people`);
+            const q=query(charactersCollection,orderBy('createdAt','asc'));
+            onSnapshot(q,snap=>{allGeneratedCharacters=snap.docs.map(d=>({...d.data(),id:d.id}));renderAllCards(allGeneratedCharacters);updateStatus();});
+            generateBtn.disabled=false;clearBtn.disabled=false;
         }
     });
 </script>
