@@ -3,115 +3,76 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>虛擬人物生成器 - 指定帳號登入</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>虛擬人物自動生成器</title>
   <style>
-    body { font-family: sans-serif; text-align: center; background: #f5f6fa; padding: 2em; }
-    h1 { font-size: 1.8em; color: #222; }
-    .card { background: white; padding: 1em; margin: 1em auto; max-width: 400px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 12px; }
-    input, button { padding: 0.5em; font-size: 1em; margin: 0.5em; border-radius: 8px; border: 1px solid #ccc; }
-    button { background: #6366f1; color: white; border: none; cursor: pointer; }
+    body {
+      font-family: "Helvetica Neue", sans-serif;
+      margin: 0;
+      background: #f4f5f7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #login, #app {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      padding: 2rem;
+      width: 320px;
+      display: none;
+    }
+    h2 { margin-top: 0; }
+    input {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      width: 100%;
+      padding: 0.6rem;
+      background-color: #5b67f3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    #error { color: red; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <h1>虛擬人物生成器</h1>
-
-  <div id="loginDiv">
+  <div id="login">
+    <h2>登入虛擬人物工具</h2>
     <input type="email" id="email" placeholder="Email" />
     <input type="password" id="password" placeholder="密碼" />
-    <button onclick="login()">登入</button>
-    <p id="loginError" style="color:red;"></p>
+    <div id="error"></div>
+    <button onclick="checkLogin()">登入</button>
   </div>
 
-  <div id="appDiv" style="display:none">
-    <p><button onclick="logout()">登出</button></p>
-    <button id="addBtn">新增人物</button>
-    <button id="clearBtn">清除所有人物</button>
-    <div id="output"></div>
+  <div id="app">
+    <h2>虛擬人物自動生成器</h2>
+    <p>歡迎使用，這裡可以放原本的人物生成工具內容。</p>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <script>
+    const allowEmail = "chenziwe@prayforo.com";
+    const allowPassword = "770011";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC0_B_n_stXFqrBd2KPoEHc4pr8Bpd4rlQ",
-      authDomain: "virtual-character-generator.firebaseapp.com",
-      projectId: "virtual-character-generator",
-      storageBucket: "virtual-character-generator.firebasestorage.app",
-      messagingSenderId: "492764039412",
-      appId: "1:492764039412:web:fe05d1755c85b95f5af6a1",
-      measurementId: "G-N5EPNFRHJN"
-    };
-
-    const allowedEmail = "chenziwe@prayforo.com";
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    let currentUserId = null;
-
-    const loginDiv = document.getElementById("loginDiv");
-    const appDiv = document.getElementById("appDiv");
-    const output = document.getElementById("output");
-
-    function login() {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      if (email !== allowedEmail) {
-        document.getElementById("loginError").textContent = "此 Email 不被允許登入。";
-        return;
-      }
-      signInWithEmailAndPassword(auth, email, password).catch((error) => {
-        document.getElementById("loginError").textContent = "登入失敗：" + error.message;
-      });
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      if (user && user.email === allowedEmail) {
-        currentUserId = user.uid;
-        loginDiv.style.display = "none";
-        appDiv.style.display = "block";
-        fetchPeople();
+    function checkLogin() {
+      const email = document.getElementById('email').value;
+      const pw = document.getElementById('password').value;
+      if (email === allowEmail && pw === allowPassword) {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
       } else {
-        loginDiv.style.display = "block";
-        appDiv.style.display = "none";
+        document.getElementById('error').textContent = "Email 或密碼錯誤";
       }
-    });
-
-    async function fetchPeople() {
-      const querySnapshot = await getDocs(collection(db, `users/${currentUserId}/people`));
-      output.innerHTML = "";
-      querySnapshot.forEach((doc) => {
-        const div = document.createElement("div");
-        div.className = "card";
-        const d = doc.data();
-        div.textContent = `${d.name}（${d.gender}／${d.age}歲）`;
-        output.appendChild(div);
-      });
     }
 
-    document.getElementById("addBtn").onclick = async () => {
-      const person = {
-        name: '小' + '東南西北中'.charAt(Math.floor(Math.random() * 6)),
-        gender: Math.random() > 0.5 ? '男' : '女',
-        age: Math.floor(Math.random() * 60) + 10
-      };
-      await addDoc(collection(db, `users/${currentUserId}/people`), person);
-      fetchPeople();
-    };
-
-    document.getElementById("clearBtn").onclick = async () => {
-      const querySnapshot = await getDocs(collection(db, `users/${currentUserId}/people`));
-      for (const d of querySnapshot.docs) {
-        await deleteDoc(doc(db, `users/${currentUserId}/people/${d.id}`));
-      }
-      fetchPeople();
-    };
-
-    function logout() {
-      signOut(auth);
-    }
+    document.getElementById('login').style.display = 'block';
   </script>
 </body>
 </html>
