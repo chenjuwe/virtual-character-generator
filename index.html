@@ -42,20 +42,7 @@
 </div>
 
 <div id="prayerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div id="modalOverlay" class="absolute inset-0 bg-black bg-opacity-50 modal-overlay"></div>
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col modal-content transform scale-95">
-        <div class="flex justify-between items-center p-4 border-b">
-            <h3 id="modalTitle" class="text-lg font-bold text-gray-800">禱告內容</h3>
-            <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        </div>
-        <div class="p-6 overflow-y-auto"><p id="prayerContent" class="text-gray-700 whitespace-pre-wrap leading-relaxed"></p></div>
-        <div class="p-4 border-t flex justify-end">
-            <button id="copyPrayerBtn" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-200">複製內容</button>
-        </div>
     </div>
-</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -77,20 +64,10 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // --- 省略部分已有的程式碼 (Firebase 初始化, DOM 元素宣告等) ---
     enableIndexedDbPersistence(db).catch(err => console.warn("離線快取失敗:", err.code));
+    setPersistence(auth, browserLocalPersistence).then(() => signInAnonymously(auth)).catch(err => console.error("匿名登入失敗:", err));
 
-    setPersistence(auth, browserLocalPersistence)
-        .then(() => signInAnonymously(auth))
-        .catch(err => console.error("匿名登入失敗:", err));
-
-    const dataPools = { /* 您的原始 dataPools 資料 */ };
-    const choice = arr => arr[Math.floor(Math.random() * arr.length)];
-    const randint = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-    function generateCharacter() { /* 您的原始 generateCharacter 函式 */ }
-    function generatePrayerFromTemplate(character) { /* 您的原始 generatePrayerFromTemplate 函式 */ }
-
-    // --- DOM 元素宣告 (省略以節省篇幅) ---
     let allGeneratedCharacters = [];
     let charactersCollection;
     const generateBtn = document.getElementById('generateBtn');
@@ -98,55 +75,40 @@
     const grid = document.getElementById('character-grid');
     const statusDiv = document.getElementById('status');
     const userIdDisplay = document.getElementById('userIdDisplay');
-    const modal = document.getElementById('prayerModal');
-    const modalOverlay = document.getElementById('modalOverlay');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const modalTitle = document.getElementById('modalTitle');
-    const prayerContent = document.getElementById('prayerContent');
-    const copyPrayerBtn = document.getElementById('copyPrayerBtn');
+    // ... 其他 DOM 元素
 
-    function updateStatus() { /* 原始 updateStatus 函式 */ }
-    function openModal() { /* 原始 openModal 函式 */ }
-    function closeModal() { /* 原始 closeModal 函式 */ }
+    // --- [重要] 這裡需要您提供 `generateCharacter` 的具體實作 ---
+    // 為了讓卡片能顯示資料，我先假設 generateCharacter() 會回傳像這樣的物件：
+    // { name: "陳小明", age: 30, gender: "男", occupation: "工程師", personality: "內向、謹慎" }
+    function generateCharacter() {
+        // 這是一個範例，請用您自己的 `generateCharacter` 函式替換
+        const names = ["林家豪", "陳怡君", "黃文雄", "張美玲", "王志明"];
+        const occupations = ["工程師", "設計師", "行銷企劃", "老師", "自由工作者"];
+        const personalities = ["開朗、外向", "內向、謹慎", "富有創造力", "務實、可靠"];
+        const choice = arr => arr[Math.floor(Math.random() * arr.length)];
+        return {
+            name: choice(names),
+            age: Math.floor(Math.random() * 40) + 20,
+            gender: Math.random() > 0.5 ? "男" : "女",
+            occupation: choice(occupations),
+            personality: choice(personalities)
+        };
+    }
+    
+    function generatePrayerFromTemplate(character) { /* 您的原始 generatePrayerFromTemplate 函式 */ }
+    function handleCardClick(character) { /* 您的原始 handleCardClick 函式 */ }
 
-    closeModalBtn.addEventListener('click', closeModal);
-    modalOverlay.addEventListener('click', closeModal);
-    copyPrayerBtn.addEventListener('click', () => { /* 原始複製處理 */ });
-
-    function handleCardClick(character) { /* 原始 handleCardClick */ }
-
-    // --- 新增按鈕事件 (建議加入 try...catch...finally) ---
-    generateBtn.addEventListener('click', async () => {
-        generateBtn.disabled = true;
-        try {
-            const newCharacter = generateCharacter();
-            await addDoc(charactersCollection, { ...newCharacter, createdAt: serverTimestamp() });
-        } catch (error) {
-            console.error("新增失敗:", error);
-            alert("新增人物失敗，請稍後再試。");
-        } finally {
-            generateBtn.disabled = false;
-        }
-    });
-
-    // --- [優化 1] 為「全部刪除」增加防呆確認，並優化流程 ---
+    // --- 「全部刪除」按鈕的事件監聽 (已優化) ---
     clearBtn.addEventListener('click', async () => {
-        // 增加防呆確認對話框
         const isConfirmed = window.confirm('您確定要刪除所有人物嗎？這個操作無法復原！');
-        if (!isConfirmed) {
-            return; // 如果使用者點擊「取消」，則中止操作
-        }
-
+        if (!isConfirmed) return;
+        
         generateBtn.disabled = true;
         clearBtn.disabled = true;
-
         try {
-            const q = query(charactersCollection);
-            const snapshot = await getDocs(q);
+            const snapshot = await getDocs(query(charactersCollection));
             const batch = writeBatch(db);
-            snapshot.docs.forEach(docToDelete => {
-                batch.delete(docToDelete.ref);
-            });
+            snapshot.docs.forEach(docToDelete => batch.delete(docToDelete.ref));
             await batch.commit();
         } catch (error) {
             console.error('刪除失敗:', error);
@@ -156,8 +118,24 @@
             clearBtn.disabled = false;
         }
     });
+
+    // --- 「新增人物」按鈕的事件監聽 (已優化) ---
+    generateBtn.addEventListener('click', async () => {
+        generateBtn.disabled = true;
+        try {
+            const newCharacter = generateCharacter();
+            await addDoc(charactersCollection, { ...newCharacter, createdAt: serverTimestamp() });
+        } catch (error) {
+            console.error("新增失敗:", error);
+            alert("新增人物失敗，請稍後再試。");
+        } finally {
+            // 注意：這裡不再需要 re-enable 按鈕，因為 onSnapshot 會處理 UI 更新，
+            // 而按鈕的狀態應該由 onAuthStateChanged 管理。為求簡單，我們暫時保留它。
+            generateBtn.disabled = false; 
+        }
+    });
     
-    // --- [優化 2] 優化初次使用的「空狀態」畫面 ---
+    // --- [修正] 補上渲染人物卡片的完整邏輯 ---
     function renderAllCards(chars) {
         grid.innerHTML = ''; // 清空現有卡片
 
@@ -173,19 +151,48 @@
                 </div>
             `;
         } else {
-            // 否則，渲染所有角色卡片
-            // 這部分假設您已有渲染卡片的邏輯，請將其放入此處
-            // 例如:
-            // chars.forEach(character => {
-            //     const card = document.createElement('div');
-            //     card.className = '...'; // 卡片樣式
-            //     card.innerHTML = `...`; // 卡片內容
-            //     grid.appendChild(card);
-            // });
+            // [這裡就是補上的核心邏輯]
+            // 否則，遍歷所有角色資料，並為每一個角色創建一個卡片
+            chars.forEach(character => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl shadow-lg overflow-hidden flex flex-col';
+                
+                // 卡片內容
+                card.innerHTML = `
+                    <div class="p-6 flex-grow">
+                        <div class="flex justify-between items-start">
+                            <h2 class="text-2xl font-bold text-gray-800">${character.name || '未命名'}</h2>
+                            <span class="bg-indigo-100 text-indigo-800 text-sm font-medium px-2.5 py-0.5 rounded-full">${character.gender || '?'}</span>
+                        </div>
+                        <p class="text-gray-600 mt-1">${character.age || '?'} 歲，${character.occupation || '職業不詳'}</p>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <h4 class="font-semibold text-gray-700">個性特質：</h4>
+                            <p class="text-gray-600 mt-1">${character.personality || '尚無描述'}</p>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-gray-50 border-t">
+                        <button class="view-prayer-btn w-full bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+                            查看禱告內容
+                        </button>
+                    </div>
+                `;
+
+                // 為「查看禱告內容」按鈕添加事件監聽
+                const viewPrayerBtn = card.querySelector('.view-prayer-btn');
+                viewPrayerBtn.addEventListener('click', () => {
+                    // 這邊需要您提供 handleCardClick 的實作
+                    // 例如：handleCardClick(character);
+                    console.log("查看人物:", character.name);
+                    alert(`正在查看 ${character.name} 的禱告內容 (此為示意)`);
+                });
+
+                // 將完成的卡片加入到格線中
+                grid.appendChild(card);
+            });
         }
     }
 
-
+    // --- onAuthStateChanged 監聽使用者登入狀態 ---
     onAuthStateChanged(auth, user => {
         if (user) {
             const uid = user.uid;
@@ -197,20 +204,23 @@
             onSnapshot(q, snap => {
                 allGeneratedCharacters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
                 renderAllCards(allGeneratedCharacters); // 呼叫優化後的渲染函式
-                updateStatus(); // 假設您有此函式
+                
+                // 更新狀態文字
+                const statusText = allGeneratedCharacters.length
+                    ? `目前雲端資料庫中總共有 ${allGeneratedCharacters.length} 位人物。`
+                    : '雲端資料庫是空的，請生成新的人物。';
+                statusDiv.textContent = statusText;
+
             }, err => console.error('監聽失敗:', err));
 
             generateBtn.disabled = false;
             clearBtn.disabled = false;
-            statusDiv.textContent = '已成功連接您的雲端資料庫。'; // 連線成功後更新狀態
         } else {
             statusDiv.textContent = '無法連接至雲端，請重新整理頁面。';
             generateBtn.disabled = true;
             clearBtn.disabled = true;
         }
     });
-
-    // (請確認您有實作 `updateStatus`, `generateCharacter` 等函式的內容)
 </script>
 
 </body>
