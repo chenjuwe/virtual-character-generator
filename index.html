@@ -4,75 +4,89 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>虛擬人物自動生成器</title>
+  <title>虛擬人物生成器</title>
   <style>
     body {
-      font-family: "Helvetica Neue", sans-serif;
-      margin: 0;
-      background: #f4f5f7;
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f5f6f8;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       height: 100vh;
+      margin: 0;
     }
-    #login, #app {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    .card {
+      background-color: #fff;
       padding: 2rem;
-      width: 320px;
-      display: none;
-    }
-    h2 { margin-top: 0; }
-    input {
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 420px;
       width: 100%;
-      padding: 0.6rem;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 1.5rem;
+    }
+    input {
+      display: block;
+      width: 100%;
+      padding: 1rem;
+      margin: 1rem 0;
+      font-size: 1.1rem;
+      border: 1px solid #bbb;
+      border-radius: 0;
+      box-sizing: border-box;
     }
     button {
       width: 100%;
-      padding: 0.6rem;
-      background-color: #5b67f3;
-      color: white;
+      padding: 1rem;
+      background-color: #4f46e5;
+      color: #fff;
       border: none;
-      border-radius: 6px;
-      font-weight: bold;
+      border-radius: 0;
+      font-size: 1.1rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
     }
-    #error { color: red; font-size: 0.85rem; }
+    #error {
+      color: red;
+      margin-top: 0.5rem;
+      height: 1.2rem;
+    }
   </style>
 </head>
 <body>
-  <div id="login">
-    <h2>登入虛擬人物工具</h2>
+  <div class="card" id="login-card">
+    <h1>虛擬人物生成器</h1>
     <input type="email" id="email" placeholder="Email" />
     <input type="password" id="password" placeholder="密碼" />
-    <div id="error"></div>
     <button onclick="checkLogin()">登入</button>
+    <div id="error"></div>
   </div>
 
-  <div id="app">
-    <h2>虛擬人物自動生成器</h2>
+  <div class="card" id="app" style="display: none;">
+    <h1>虛擬人物自動生成器</h1>
     <p>歡迎使用，這裡可以放原本的人物生成工具內容。</p>
   </div>
 
   <script>
-    const allowEmail = "chenziwe@prayforo.com";
-    const allowPassword = "770011";
-
     function checkLogin() {
-      const email = document.getElementById('email').value;
-      const pw = document.getElementById('password').value;
-      if (email === allowEmail && pw === allowPassword) {
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const password = document.getElementById("password").value.trim();
+      const error = document.getElementById("error");
+
+      if (email === "chenziwe@prayforo.com" && password === "770011") {
+        document.getElementById("login-card").style.display = "none";
+        document.getElementById("app").style.display = "block";
       } else {
-        document.getElementById('error').textContent = "Email 或密碼錯誤";
+        error.textContent = "登入失敗，請檢查 Email 或密碼是否正確。";
       }
     }
 
-    document.getElementById('login').style.display = 'block';
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") checkLogin();
+    });
   </script>
 </body>
 </html>
