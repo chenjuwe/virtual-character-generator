@@ -9,11 +9,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.5rem; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .modal-overlay { transition: opacity 0.3s ease; }
-        .modal-content { transition: transform 0.3s ease; }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 1.5rem;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -25,18 +38,14 @@
     </header>
 
     <div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md flex justify-center space-x-4 mb-8">
-        <button id="generateBtn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200" disabled>
-            新增一位人物
-        </button>
-        <button id="clearBtn" class="bg-red-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200" disabled>
-            全部刪除
-        </button>
+        <button id="generateBtn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200" disabled>新增一位人物</button>
+        <button id="clearBtn" class="bg-red-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200" disabled>全部清除</button>
     </div>
 
     <div id="status" class="text-center text-gray-500 my-4">正在連接您的雲端資料庫...</div>
     <div id="userIdDisplay" class="text-center text-gray-400 text-xs my-2"></div>
 
-    <main id="character-grid" class="card-grid"><!-- 角色卡片 --></main>
+    <main id="character-grid" class="card-grid"></main>
 
     <footer class="text-center mt-12 text-gray-400 text-sm">此資料庫由 AI 生成，僅供參考。</footer>
 </div>
@@ -52,93 +61,200 @@
             </button>
         </div>
         <div class="p-6 overflow-y-auto"><p id="prayerContent" class="text-gray-700 whitespace-pre-wrap leading-relaxed"></p></div>
-        <div class="p-4 border-t flex justify-end">
-            <button id="copyPrayerBtn" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-200">複製內容</button>
-        </div>
+        <div class="p-4 border-t flex justify-end"><button id="copyPrayerBtn" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-200">複製內容</button></div>
     </div>
 </div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, getDocs, writeBatch, doc, serverTimestamp, orderBy, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyC0_B_n_stXFqrBd2KPoEHc4pr8Bpd4rlQ",
-        authDomain: "virtual-character-generator.firebaseapp.com",
-        projectId: "virtual-character-generator",
-        storageBucket: "virtual-character-generator.appspot.com",
-        messagingSenderId: "492764039412",
-        appId: "1:492764039412:web:fe05d1755c85b95faf6a1",
-        measurementId: "G-N5EPNFRHJN"
-    };
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+// Firebase 配置
+const firebaseConfig = {
+    apiKey: "AIzaSyC0_B_n_stXFqrBd2KPoEHc4pr8Bpd4rlQ",
+    authDomain: "virtual-character-generator.firebaseapp.com",
+    projectId: "virtual-character-generator",
+    storageBucket: "virtual-character-generator.appspot.com",
+    messagingSenderId: "492764039412",
+    appId: "1:492764039412:web:fe05d1755c85b95faf6a1",
+    measurementId: "G-N5EPNFRHJN"
+};
 
-    // 啟用離線快取
-    enableIndexedDbPersistence(db).catch(err => console.warn("離線快取失敗:", err.code));
+// 初始化
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-    // 本地持久化匿名登入
-    setPersistence(auth, browserLocalPersistence)
-        .then(() => signInAnonymously(auth))
-        .catch(err => console.error("匿名登入失敗:", err));
+// 啟用離線快取
+enableIndexedDbPersistence(db).catch(err => console.warn("離線快取失敗:", err.code));
 
-    const dataPools = { /* 原始 dataPools 全部複製貼上 */ };
-    const choice = arr => arr[Math.floor(Math.random() * arr.length)];
-    const randint = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+// 本地持久化匿名登入
+setPersistence(auth, browserLocalPersistence)
+    .then(() => signInAnonymously(auth))
+    .catch(err => console.error("匿名登入失敗:", err));
 
-    function generateCharacter() { /* 原始 generateCharacter 函式 */ }
-    function generatePrayerFromTemplate(character) { /* 原始 generatePrayerFromTemplate 函式 */ }
+// 資料池
+const dataPools = {
+    surnames_zh: ['陳','林','黃','張','李','王','吳','劉','蔡','楊','許','鄭','謝','郭','洪','曾','邱','廖','賴','周','蘇','葉','莊','江'],
+    surnames_en: ['Chen','Lin','Huang','Chang','Lee','Wang','Wu','Liu','Tsai','Yang','Hsu','Cheng','Hsieh','Kuo','Hung','Tseng','Chiu','Liao','Lai','Chou','Su','Yeh','Chuang','Chiang'],
+    given_names_male_zh: ['志明','家豪','俊傑','建宏','文雄','俊賢','志偉','承翰','冠宇','宇軒','品睿','宥廷','宇恩','立揚','向陽','宥翔','柏翰','宗翰','冠霖'],
+    given_names_female_zh: ['怡君','淑芬','美玲','雅婷','淑惠','靜宜','心雅','詩涵','品妍','詠晴','諾雅','安琪','向晴','宥寧','佳穎','欣妤','子晴'],
+    given_names_male_en: ['David','Michael','Jason','Kevin','Daniel','Brian','Alex','Ethan','Ryan','Leo','Jeff','Hank','Wayne','Gary','Peter','Steven'],
+    given_names_female_en: ['Emily','Jessica','Michelle','Tiffany','Grace','Sarah','Cindy','Sharon','Ann','Vivian','Jean','Fiona','Irene','Claire','Yvonne'],
+    education_jobs: {
+        '高中職畢': [
+            {title:'美髮設計師',economic:'在連鎖髮廊工作，收入靠底薪加抽成，時好時壞。'},
+            {title:'貨車司機',economic:'長途運輸司機，工時長但收入不錯，只是很少在家。'},
+            {title:'保全人員',economic:'在社區擔任保全，薪水固定，工作單純但枯燥。'}
+        ],
+        '專科畢': [
+            {title:'室內設計師',economic:'自己開工作室，案源不穩定，時常需要熬夜趕工。'},
+            {title:'幼教老師',economic:'熱愛孩子但薪水不高，對工作的熱情正被現實消磨。'},
+            {title:'西餐廚師',economic:'在飯店擔任二廚，夢想是開一間自己的小餐館。'}
+        ],
+        '大學畢': [
+            {title:'金融分析師',economic:'在高壓的金融業工作，收入優渥但幾乎沒有私生活。'},
+            {title:'高中老師',economic:'在公立高中任教，工作穩定，正煩惱學生的各種問題。'},
+            {title:'社群經理',economic:'在網路新創公司工作，對成效指標感到焦慮。'},
+            {title:'物理治療師',economic:'在復健科診所工作，收入穩定，對病患很有耐心。'}
+        ],
+        '碩士畢': [
+            {title:'大學助理教授',economic:'學術界的菜鳥，為了升等和研究經費而苦惱。'},
+            {title:'心理諮商師',economic:'自己開業，時常承接他人的負面情緒，需要自我調適。'},
+            {title:'AI研發工程師',economic:'在知名科技公司工作，是團隊的核心成員。'}
+        ],
+        '在學生': [
+            {title:'研究生',economic:'靠著微薄的研究助理費和家裡支持過活，學業壓力大。'}
+        ]
+    },
+    health_issues: ['焦慮症','失眠','甲狀腺功能低下','虹彩炎','胃食道逆流','慢性蕁麻疹','三高','椎間盤突出','過敏性鼻炎','偏頭痛'],
+    hobbies: ['烘焙','跑馬拉松','水肺潛水','城市速寫','玩密室逃脫','學習烏克麗麗','看舞台劇','研究投資理財','手沖咖啡','攀岩','園藝'],
+    communication_styles: ['直率坦誠型','委婉圓滑型','幽默風趣型','分析數據型','溫和傾聽型','邏輯分析型','情感渲染型'],
+    strengths: ['有創造力','有紀律','樂觀積極','善於分析','適應力強','有同理心','勇於承擔','執行力強'],
+    weaknesses: ['不切實際','缺乏彈性','過於天真','優柔寡斷','三分鐘熱度','容易分心'],
+    faith_types: [
+        {status:'已受洗',type:'原生家庭基督徒',desc:'從小在教會長大，信仰根基深厚，但有時會感到疲乏。'},
+        {status:'慕道友',type:'理性思辨型',desc:'對護教學和科學與信仰的關係特別著迷。'},
+        {status:'已受洗',type:'生活掙扎型',desc:'曾是敬拜團成員，孩子出生後暫停服事。'},
+        {status:'福音朋友',type:'社群連結型',desc:'因伴侶開始接觸教會，非常喜歡小組氛圍。'}
+    ],
+    life_events: ['曾在外國打工度假','經歷創業失敗','家庭關係複雜','曾是樂團成員','放棄夢想照顧家人'],
+    fears: ['害怕失敗','害怕孤單','害怕被遺忘','害怕衝突'],
+    dreams: ['環遊世界','建立幸福家庭','開咖啡店','寫一本書','提前退休']
+};
 
-    let allGeneratedCharacters = [];
-    let charactersCollection;
-    const generateBtn = document.getElementById('generateBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const grid = document.getElementById('character-grid');
-    const statusDiv = document.getElementById('status');
-    const userIdDisplay = document.getElementById('userIdDisplay');
-    const modal = document.getElementById('prayerModal');
-    const modalOverlay = document.getElementById('modalOverlay');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const modalTitle = document.getElementById('modalTitle');
-    const prayerContent = document.getElementById('prayerContent');
-    const copyPrayerBtn = document.getElementById('copyPrayerBtn');
+// 隨機輔助
+const choice = arr => arr[Math.floor(Math.random()*arr.length)];
+const randint = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
 
-    function updateStatus() {
-        statusDiv.textContent = allGeneratedCharacters.length
-            ? `目前雲端資料庫中總共有 ${allGeneratedCharacters.length} 位人物。`
-            : '雲端資料庫是空的，請生成新的人物。';
+function generateCharacter() {
+    const gender = choice(['male','female']);
+    const age = randint(22,55);
+    const currentYear = new Date().getFullYear();
+    const birthYear = currentYear - age;
+    const birthDate = `${birthYear}-${String(randint(1,12)).padStart(2,'0')}-${String(randint(1,28)).padStart(2,'0')}`;
+    const surnameZh = choice(dataPools.surnames_zh);
+    const idx = dataPools.surnames_zh.indexOf(surnameZh);
+    const surnameEn = dataPools.surnames_en[idx];
+    const givenZh = gender==='male'? choice(dataPools.given_names_male_zh): choice(dataPools.given_names_female_zh);
+    const givenEn = gender==='male'? choice(dataPools.given_names_male_en): choice(dataPools.given_names_female_en);
+    const name_and_birthday = `${surnameZh}${givenZh}<br>${givenEn} ${surnameEn}<br>${birthDate}`;
+    const email_prefix = `\`${givenEn.toLowerCase()}.${surnameEn.toLowerCase()}${String(birthYear).slice(-2)}\```;
+    // 教育與職業
+    let education;
+    if(age<=24) education='在學生';
+    else if(age<=35) education=choice(['高中職畢','專科畢','大學畢']);
+    else education=choice(['大學畢','碩士畢']);
+    const job = choice(dataPools.education_jobs[education]);
+    const economic_profile = `**${education}，${job.title}。**<br>${job.economic}`;
+    // 關係
+    let relationship_status='**單身**';
+    let family='無';
+    const roll=Math.random();
+    if(age>=28 && roll<0.7) {
+        relationship_status='**已婚**';
+        const spouseZh = choice(dataPools.surnames_zh)+choice(gender==='male'?dataPools.given_names_female_zh:dataPools.given_names_male_zh);
+        family=`**配偶:** ${spouseZh}`;
     }
-    function openModal() { modal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); setTimeout(() => { modalOverlay.classList.remove('opacity-0'); modal.querySelector('.modal-content').classList.remove('scale-95'); }, 10); }
-    function closeModal() { modalOverlay.classList.add('opacity-0'); modal.querySelector('.modal-content').classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }, 300); }
+    // 信仰
+    const faith = choice(dataPools.faith_types);
+    let faith_profile=`**${faith.status}**<br>**${faith.type}**<br>${faith.desc}`;
+    if(faith.status==='已受洗') faith_profile=`**已受洗 (${randint(1,age-18)}年)**<br>**${faith.type}**<br>${faith.desc}`;
+    return {
+        name_and_birthday, email_prefix, relationship_status, family_members:family,
+        faith_profile,
+        strengths_weaknesses:`**優點:** ${choice(dataPools.strengths)}<br>**缺點:** ${choice(dataPools.weaknesses)}`,
+        health_issues:choice(dataPools.health_issues), economic_profile,
+        communication_style:choice(dataPools.communication_styles), hobbies:choice(dataPools.hobbies),
+        life_event:choice(dataPools.life_events), fear:choice(dataPools.fears), dream:choice(dataPools.dreams),
+        createdAt: serverTimestamp()
+    };
+}
 
-    closeModalBtn.addEventListener('click', closeModal);
-    modalOverlay.addEventListener('click', closeModal);
-    copyPrayerBtn.addEventListener('click', () => { /* 原始複製處理 */ });
+function generatePrayerFromTemplate(ch) {
+    const clean = txt=> txt.replace(/<br>/g,' ').replace(/\*\*|`/g,'');
+    let prayer="親愛的天父，\n\n";
+    prayer+=`感謝祢賜...
 
-    function handleCardClick(character) { /* 原始 handleCardClick */ }
+}
 
-    generateBtn.addEventListener('click', async () => { /* 原始新增程式 */ });
-    clearBtn.addEventListener('click', async () => { /* 原始清除程式 */ });
+// UI 與互動
+let allGeneratedCharacters=[];
+let charactersCollection;
+const generateBtn=document.getElementById('generateBtn');
+const clearBtn=document.getElementById('clearBtn');
+const grid=document.getElementById('character-grid');
+const statusDiv=document.getElementById('status');
+const userIdDisplay=document.getElementById('userIdDisplay');
+const modal=document.getElementById('prayerModal');
+const modalOverlay=document.getElementById('modalOverlay');
+const closeModalBtn=document.getElementById('closeModalBtn');
+const modalTitle=document.getElementById('modalTitle');
+const prayerContent=document.getElementById('prayerContent');
+const copyPrayerBtn=document.getElementById('copyPrayerBtn');
 
-    function renderAllCards(chars) { /* 原始 renderAllCards */ }
+function updateStatus() {
+    statusDiv.textContent = allGeneratedCharacters.length
+        ? `目前雲端資料庫中總共有 ${allGeneratedCharacters.length} 位人物。`
+        : '雲端資料庫是空的，請生成新的人物。';
+}
+function openModal() { modal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); setTimeout(()=>{modalOverlay.classList.remove('opacity-0');modal.querySelector('.modal-content').classList.remove('scale-95');},10);}    
+function closeModal(){ modalOverlay.classList.add('opacity-0');modal.querySelector('.modal-content').classList.add('scale-95');setTimeout(()=>{modal.classList.add('hidden');document.body.classList.remove('overflow-hidden');},300);}    
+closeModalBtn.addEventListener('click',closeModal);
+modalOverlay.addEventListener('click',closeModal);
+copyPrayerBtn.addEventListener('click',()=>{navigator.clipboard.writeText(prayerContent.innerText);copyPrayerBtn.textContent='已複製！';setTimeout(()=>{copyPrayerBtn.textContent='複製內容';},2000);});
 
-    onAuthStateChanged(auth, user => {
-        if (user) {
-            const uid = user.uid;
-            userIdDisplay.textContent = `您的專屬雲端ID: ${uid}`;
-            charactersCollection = collection(db, `characters/${uid}/people`);
-            const q = query(charactersCollection, orderBy('createdAt', 'asc'));
-            onSnapshot(q, snap => {
-                allGeneratedCharacters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-                renderAllCards(allGeneratedCharacters);
-                updateStatus();
-            }, err => console.error('監聽失敗:', err));
-            generateBtn.disabled = false;
-            clearBtn.disabled = false;
-        }
-    });
+function handleCardClick(ch){modalTitle.textContent=ch.name_and_birthday.split('<br>')[0]+' 的禱告';prayerContent.textContent=generatePrayerFromTemplate(ch);openModal();}
+
+generateBtn.addEventListener('click',async()=>{
+    generateBtn.disabled=true;statusDiv.textContent='正在生成並上傳...';
+    try{const newCh=generateCharacter();await addDoc(charactersCollection,newCh);}catch(e){console.error(e);statusDiv.textContent='新增失敗：'+e.message;}finally{generateBtn.disabled=false;}
+});
+
+clearBtn.addEventListener('click',async()=>{
+    if(!confirm('確定要清除所有資料?')) return;
+    clearBtn.disabled=generateBtn.disabled=true;statusDiv.textContent='正在清除...';
+    try{const snap=await getDocs(charactersCollection);const batch=writeBatch(db);snap.forEach(doc=>batch.delete(doc.ref));await batch.commit();}catch(e){console.error(e);statusDiv.textContent='清除失敗：'+e.message;}finally{clearBtn.disabled=generateBtn.disabled=false;}
+});
+
+function renderAllCards(chars){grid.innerHTML='';chars.forEach(ch=>{
+    const card=document.createElement('div');card.className='bg-white rounded-xl shadow-lg p-6 flex flex-col hover:-translate-y-1 transition-transform cursor-pointer';card.addEventListener('click',()=>handleCardClick(ch));
+    const title=`<div class="border-b pb-4 text-center"><h2 class="text-xl font-bold">${ch.name_and_birthday.split('<br>')[0]}</h2><p class="text-sm text-gray-500">${ch.name_and_birthday.split('<br>')[1]}</p><p class="text-xs text-gray-400 mt-1">${ch.name_and_birthday.split('<br>')[2]}</p></div>`;
+    card.innerHTML=title+`<div class="mt-4 text-gray-600 text-sm">電子信箱: ${ch.email_prefix}</div><div class="mt-2 text-gray-600 text-sm">狀態: ${ch.relationship_status}</div>`;
+    grid.appendChild(card);
+});}
+
+onAuthStateChanged(auth,user=>{
+    if(user){
+        const uid=user.uid;
+        userIdDisplay.textContent=`您的專屬雲端ID: ${uid}`;
+        charactersCollection=collection(db,`characters/${uid}/people`);
+        const q=query(charactersCollection,orderBy('createdAt','asc'));
+        onSnapshot(q,snap=>{allGeneratedCharacters=snap.docs.map(d=>({...d.data(),id:d.id}));renderAllCards(allGeneratedCharacters);updateStatus();});
+        generateBtn.disabled=false;clearBtn.disabled=false;
+    }
+});
 </script>
 </body>
 </html>
