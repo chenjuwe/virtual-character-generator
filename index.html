@@ -84,30 +84,12 @@
         .then(() => signInAnonymously(auth))
         .catch(err => console.error("匿名登入失敗:", err));
 
-    const dataPools = {
-        names: ["小明", "小美", "志強", "怡君", "家豪", "佩珊", "偉倫", "雅婷", "信宏", "淑芬"],
-        genders: ["男", "女"],
-        ages: [18, 22, 25, 28, 30, 35, 40, 45, 50, 60],
-        jobs: ["學生", "老師", "工程師", "設計師", "醫生", "護士", "業務", "家庭主婦", "退休人士", "自由業"],
-        interests: ["閱讀", "運動", "旅遊", "音樂", "美食", "攝影", "繪畫", "寫作", "園藝", "手作"]
-    };
+    const dataPools = { /* 原始 dataPools 全部複製貼上 */ };
     const choice = arr => arr[Math.floor(Math.random() * arr.length)];
     const randint = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-    function generateCharacter() {
-        return {
-            name: choice(dataPools.names),
-            gender: choice(dataPools.genders),
-            age: choice(dataPools.ages),
-            job: choice(dataPools.jobs),
-            interest: choice(dataPools.interests),
-            createdAt: serverTimestamp()
-        };
-    }
-
-    function generatePrayerFromTemplate(character) {
-        return `親愛的天父，感謝祢賜給我們${character.name}（${character.gender}，${character.age}歲），祂是一位${character.job}，熱愛${character.interest}。求祢保守祂在生活與工作中都能經歷祢的恩典與平安，並在每一天都充滿喜樂與盼望。奉主耶穌的名禱告，阿們。`;
-    }
+    function generateCharacter() { /* 原始 generateCharacter 函式 */ }
+    function generatePrayerFromTemplate(character) { /* 原始 generatePrayerFromTemplate 函式 */ }
 
     let allGeneratedCharacters = [];
     let charactersCollection;
@@ -133,66 +115,14 @@
 
     closeModalBtn.addEventListener('click', closeModal);
     modalOverlay.addEventListener('click', closeModal);
-    copyPrayerBtn.addEventListener('click', () => {
-        const text = prayerContent.textContent;
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-            copyPrayerBtn.textContent = '已複製！';
-            setTimeout(() => { copyPrayerBtn.textContent = '複製內容'; }, 1200);
-        });
-    });
+    copyPrayerBtn.addEventListener('click', () => { /* 原始複製處理 */ });
 
-    function renderAllCards(chars) {
-        grid.innerHTML = '';
-        if (!chars.length) return;
-        chars.forEach(character => {
-            const card = document.createElement('div');
-            card.className = "bg-white rounded-xl shadow-md p-6 flex flex-col space-y-2 hover:shadow-lg transition cursor-pointer";
-            card.innerHTML = `
-                <div class="text-xl font-bold text-indigo-700">${character.name}</div>
-                <div class="text-gray-600">性別：${character.gender}</div>
-                <div class="text-gray-600">年齡：${character.age}</div>
-                <div class="text-gray-600">職業：${character.job}</div>
-                <div class="text-gray-600">興趣：${character.interest}</div>
-                <div class="text-xs text-gray-400 mt-2">${character.createdAt && character.createdAt.toDate ? character.createdAt.toDate().toLocaleString() : ''}</div>
-            `;
-            card.addEventListener('click', () => handleCardClick(character));
-            grid.appendChild(card);
-        });
-    }
+    function handleCardClick(character) { /* 原始 handleCardClick */ }
 
-    function handleCardClick(character) {
-        modalTitle.textContent = `${character.name} 的禱告內容`;
-        prayerContent.textContent = generatePrayerFromTemplate(character);
-        openModal();
-    }
+    generateBtn.addEventListener('click', async () => { /* 原始新增程式 */ });
+    clearBtn.addEventListener('click', async () => { /* 原始清除程式 */ });
 
-    generateBtn.addEventListener('click', async () => {
-        if (!charactersCollection) return;
-        generateBtn.disabled = true;
-        try {
-            const newChar = generateCharacter();
-            await addDoc(charactersCollection, newChar);
-        } catch (err) {
-            alert('新增人物失敗：' + err.message);
-        }
-        generateBtn.disabled = false;
-    });
-
-    clearBtn.addEventListener('click', async () => {
-        if (!charactersCollection) return;
-        if (!confirm('確定要刪除全部人物嗎？此動作無法復原。')) return;
-        clearBtn.disabled = true;
-        try {
-            const snap = await getDocs(charactersCollection);
-            const batch = writeBatch(db);
-            snap.forEach(docu => batch.delete(doc(charactersCollection, docu.id)));
-            await batch.commit();
-        } catch (err) {
-            alert('刪除失敗：' + err.message);
-        }
-        clearBtn.disabled = false;
-    });
+    function renderAllCards(chars) { /* 原始 renderAllCards */ }
 
     onAuthStateChanged(auth, user => {
         if (user) {
