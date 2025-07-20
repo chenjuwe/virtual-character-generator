@@ -144,3 +144,38 @@ body {
           width: 100%;
       }
   }
+  /* 新增：禱告日誌列表樣式 */
+.prayer-content-box {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-top: 15px;
+    text-align: left;
+    max-height: 400px; /* 設定最大高度 */
+    overflow-y: auto;  /* 超出高度時顯示滾動條 */
+}
+
+.prayer-item {
+    border-bottom: 1px dashed #ccc;
+    padding: 10px 0;
+    margin-bottom: 10px;
+}
+
+.prayer-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.prayer-timestamp {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.prayer-text {
+    white-space: pre-wrap;
+    font-style: italic;
+    color: #333;
+}

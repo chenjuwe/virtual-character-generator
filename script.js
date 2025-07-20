@@ -154,7 +154,7 @@ function generateRandomCharacter(isSpecific = false) {
             id: Date.now() + Math.random(),
             nickname: sample(db.christianNicknames),
             emailPrefix: emailPrefix,
-            prayerContent: ""
+            prayers: [] // **修改**: 初始化為空的禱告陣列
         };
     }
 
@@ -277,9 +277,42 @@ function generateRandomCharacter(isSpecific = false) {
         humorType: sample(db.humorTypeOptions),
         symbolicItem: sample(db.symbolicItemOptions),
         habitAction: sample(db.habitActionOptions),
-        prayerContent: ""
+        prayers: [] // **修改**: 初始化為空的禱告陣列
     };
 }
+
+// **新增**: 專門用來渲染禱告列表的輔助函式
+function renderPrayerList(container, prayers) {
+    container.innerHTML = ''; // 先清空
+
+    if (!prayers || prayers.length === 0) {
+        container.innerHTML = '點擊「生成禱告」按鈕，讓 AI 為這個人物寫出禱告文。';
+        return;
+    }
+
+    // 依時間倒序排列 (最新的在最上面)
+    const sortedPrayers = prayers.slice().sort((a, b) => b.timestamp - a.timestamp);
+
+    sortedPrayers.forEach(prayer => {
+        const prayerItem = document.createElement('div');
+        prayerItem.className = 'prayer-item';
+
+        const prayerDate = new Date(prayer.timestamp).toLocaleString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        prayerItem.innerHTML = `
+            <div class="prayer-timestamp">${prayerDate}</div>
+            <div class="prayer-text">${prayer.text}</div>
+        `;
+        container.appendChild(prayerItem);
+    });
+}
+
 
 // 渲染單張卡片的函式
 function renderCard(character, isSaved = false) {
@@ -372,10 +405,14 @@ function renderCard(character, isSaved = false) {
             <strong>休閒娛樂深度</strong>：${character.leisureDepth}<br>
         </div>
         <div class="category-title" style="margin-top: 20px;">AI 生成禱告文</div>
-        <div class="prayer-content-box" data-field="prayerContent">
-            ${character.prayerContent || '點擊「生成禱告」按鈕，讓 AI 為這個人物寫出禱告文。'}
-        </div>
+        <div class="prayer-content-box">
+            </div>
     `;
+    
+    // **修改**: 渲染禱告列表
+    const prayerBox = card.querySelector('.prayer-content-box');
+    renderPrayerList(prayerBox, character.prayers);
+
 
     if (isSaved) {
         container.appendChild(card);
@@ -417,10 +454,21 @@ function renderCard(character, isSaved = false) {
         prayerBox.innerHTML = '<span class="prayer-loading">正在生成中，請稍候...</span>';
         generatePrayerBtn.disabled = true;
         try {
-            const prayer = await generateSelfPrayerContent(character);
-            prayerBox.textContent = prayer;
-            character.prayerContent = prayer;
-            updateDisplayedCharacter(character.id, 'prayerContent', prayer); // Ensure prayer content is saved if character is saved
+            const prayerText = await generateSelfPrayerContent(character);
+            
+            // **修改**: 將新禱告加入陣列並儲存
+            const newPrayer = { text: prayerText, timestamp: Date.now() };
+            if (!character.prayers) { // 確保 prayers 陣列存在
+                character.prayers = [];
+            }
+            character.prayers.push(newPrayer);
+            
+            // 更新並儲存整個 prayers 陣列
+            updateDisplayedCharacter(character.id, 'prayers', character.prayers); 
+            
+            // 重新渲染禱告列表
+            renderPrayerList(prayerBox, character.prayers);
+
         } catch (error) {
             prayerBox.textContent = `生成失敗：${error.message || '未知錯誤'}`;
             console.error("生成禱告失敗:", error);
@@ -434,6 +482,16 @@ function renderCard(character, isSaved = false) {
 function copyCharacterInfo(characterId) {
     const character = displayedCharacters.find(char => char.id == characterId);
     if (!character) return;
+
+    // **修改**: 格式化禱告列表以供複製
+    let prayersToCopy = '尚未生成禱告內容。';
+    if (character.prayers && character.prayers.length > 0) {
+        const sortedPrayers = character.prayers.slice().sort((a, b) => b.timestamp - a.timestamp);
+        prayersToCopy = sortedPrayers.map(p => {
+            const prayerDate = new Date(p.timestamp).toLocaleString('zh-TW');
+            return `[${prayerDate}]\n${p.text}`;
+        }).join('\n\n');
+    }
 
     let textToCopy = `個人資訊
 姓名：${character.chineseName}
@@ -488,7 +546,7 @@ ${character.spouseName ? `另一半姓名：${character.spouseName}\n配偶年�
 休閒娛樂深度：${character.leisureDepth}
 
 AI 生成禱告文:
-${character.prayerContent || '尚未生成禱告內容。'}`;
+${prayersToCopy}`;
 
     const textArea = document.createElement("textarea");
     textArea.value = textToCopy.trim();
@@ -554,7 +612,6 @@ function saveCharacter(characterId, button) {
 
 
 function deleteCharacter(characterId) {
-    // **優化**：增加刪除前的確認提示
     const isConfirmed = confirm("您確定要刪除這個人物嗎？此操作無法復原。");
     if (!isConfirmed) {
         return;
@@ -573,10 +630,31 @@ function deleteCharacter(characterId) {
 }
 
 function loadSavedCharacters() {
-    const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+    // **新增**: 資料轉換/遷移邏輯
+    // 檢查是否有舊格式的資料 (prayerContent 是字串) 並轉換它
+    let needsResave = false;
+    savedCharacters.forEach(character => {
+        if (character.prayerContent && typeof character.prayerContent === 'string') {
+            character.prayers = [{ text: character.prayerContent, timestamp: Date.now() }];
+            delete character.prayerContent; // 刪除舊的欄位
+            needsResave = true;
+        } else if (!character.prayers) {
+            // 如果連 prayers 欄位都沒有，就給一個空的
+            character.prayers = [];
+        }
+    });
+
+    // 如果進行了轉換，就將新格式存回 localStorage
+    if (needsResave) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+    }
+
+
     displayedCharacters = [...savedCharacters];
     const container = document.querySelector('.container');
-    container.innerHTML = ''; // 清空容器
+    container.innerHTML = ''; 
     
     if (displayedCharacters.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: #666; font-size: 1.1em;">目前沒有儲存的人物，點擊上方「✨ 生成新人物」開始創建吧！</p>';
@@ -613,14 +691,13 @@ function importCharacters(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             if (Array.isArray(importedData)) {
-                // 基本的驗證，確保匯入的物件有 id
                 const isValid = importedData.every(item => typeof item === 'object' && item.id);
                 if (!isValid) {
                      throw new Error("Invalid file content.");
                 }
 
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
-                loadSavedCharacters(); // 重新載入所有人物
+                loadSavedCharacters();
                 
                 const btn = document.getElementById('importBtn');
                 const originalText = btn.textContent;
@@ -633,17 +710,14 @@ function importCharacters(event) {
             console.error("匯入失敗:", error);
             alert(`匯入失敗：檔案格式錯誤或內容不符！\n${error.message}`);
         } finally {
-            // 重置 file input 的值，這樣使用者才能再次上傳同一個檔案
             event.target.value = '';
         }
     };
     reader.readAsText(file);
 }
 
-// NEW FUNCTION: Generate prayer content using Gemini API
 async function generateSelfPrayerContent(characterData) {
     try {
-        // **注意**：路徑已修改為 /api/generateprayer
         const response = await fetch('/api/generateprayer', {
             method: 'POST',
             headers: {
