@@ -641,8 +641,6 @@ function importCharacters(event) {
 }
 
 // NEW FUNCTION: Generate prayer content using Gemini API
-// 在 script.js 中
-
 async function generateSelfPrayerContent(characterData) {
     try {
         // **注意**：路徑已修改為 /api/generateprayer
