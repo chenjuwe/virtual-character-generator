@@ -3,11 +3,72 @@ body {
   background-color: #f5f7fa;
   display: flex;
   justify-content: center;
-  padding: 100px 20px 20px 20px; /* 增加頂部 padding 以免內容被 header 蓋住 */
+  padding-top: 80px; /* 預留 header 空間 */
   font-size: 14px;  
 }
+
+#app-container {
+    width: 100%;
+    padding: 20px;
+}
+
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #ffffff;
+    padding: 10px 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1400px;
+    margin: 0 auto;
+    flex-wrap: wrap;
+}
+
+.main-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.auth-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#user-display {
+    font-size: 12px;
+    color: #555;
+    white-space: nowrap;
+}
+
+.welcome-message {
+    text-align: center;
+    margin-top: 100px;
+    color: #666;
+}
+.welcome-message h1 {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
 .container {
-  text-align: center;
+  display: flex; 
+  flex-wrap: wrap; 
+  justify-content: center; 
+  gap: 20px; 
+  align-items: flex-start; 
+  width: 100%; 
+  max-width: 1400px;
+  margin: 0 auto;
 }
 .character-card {
   background-color: #fff;
@@ -17,11 +78,11 @@ body {
   text-align: left;
   flex: 1 1 400px;
   min-width: 400px;
-  max-width: 100%; /* 防止卡片在 flex 佈局中變得過寬 */
+  max-width: 100%;
   line-height: 1.8;
   position: relative;  
   transition: max-height 0.5s ease-in-out;
-  margin-bottom: 20px; /* Add margin to separate cards */
+  margin-bottom: 20px;
 }
 .category-title {
   font-size: 14px;  
@@ -35,19 +96,25 @@ body {
 .character-card > .category-title:first-of-type {
     margin-top: 0;
 }
-header button {
+header button, .auth-container button {
   height: 40px;  
-  padding: 0 15px; /* 稍微減少 padding */
+  padding: 0 15px;
   border: none;
   border-radius: 0;
   cursor: pointer;
   font-size: 14px;  
-  margin: 5px; /* 增加 margin 以應對換行 */
+  margin: 5px 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap; /* 防止按鈕文字換行 */
+  white-space: nowrap;
 }
+
+header button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
 #generateBtn {
     background-color: #4CAF50;
     color: white;
@@ -56,7 +123,15 @@ header button {
     background-color: #607D8B;
     color: white;
 }
-header button:hover {
+#loginBtn {
+    background-color: #4285F4;
+    color: white;
+}
+#logoutBtn {
+    background-color: #f44336;
+    color: white;
+}
+header button:hover:not(:disabled) {
     opacity: 0.8;
 }
 .card-actions {
@@ -89,7 +164,7 @@ header button:hover {
     background-color: #2196F3;
 }
 .card-actions .generate-prayer-btn {
-    background-color: #8E24AA; /* Purple */
+    background-color: #8E24AA;
 }
 .editable-field {
     border: 1px solid transparent;
@@ -113,18 +188,14 @@ header button:hover {
     font-style: italic;
     color: #666;
 }
-
-/* **新增**: 欄位容器和複製按鈕樣式 */
 .field-container {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    /* 確保容器本身有足夠的空間，但移除其內部的 line-height 影響 */
     line-height: 1.2; 
-    padding: 4px 0; /* 增加上下間距 */
+    padding: 4px 0;
 }
 .field-container span {
-    /* 讓 span 內的文字恢復正常的行高 */
     line-height: 1.8; 
 }
 .field-copy-btn {
@@ -135,18 +206,17 @@ header button:hover {
     padding: 2px 8px;
     font-size: 11px;
     cursor: pointer;
-    margin-left: 10px; /* 與左側內容的間距 */
+    margin-left: 10px;
     transition: background-color 0.2s;
 }
 .field-copy-btn:hover {
     background-color: #bdbdbd;
 }
 
-
-/* 響應式設計 (RWD) */
 @media (max-width: 768px) {
-    body {
-        padding-top: 160px; /* 增加 header 空間，因為按鈕可能會換成兩行 */
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
     }
     .character-card {
         min-width: 100%;
@@ -165,7 +235,6 @@ header button:hover {
     }
 }
 
-/* 禱告日誌列表樣式 */
 .prayer-content-box {
     background-color: #fff0f3; 
     border: 1px solid #eee;
@@ -234,7 +303,6 @@ header button:hover {
     color: #d32f2f;
 }
 
-/* 自訂對話框樣式 */
 .modal-overlay {
     position: fixed;
     top: 0;
