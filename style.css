@@ -1,164 +1,153 @@
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f5f7fa;
+  font-family: Arial, sans-serif;
+  background-color: #f5f7fa;
+  display: flex;
+  justify-content: center;
+  padding: 100px 20px 20px 20px; /* 增加頂部 padding 以免內容被 header 蓋住 */
+  font-size: 14px;  
+}
+.container {
+  text-align: center;
+}
+.character-card {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 0;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  text-align: left;
+  flex: 1 1 400px;
+  min-width: 400px;
+  max-width: 100%; /* 防止卡片在 flex 佈局中變得過寬 */
+  line-height: 1.8;
+  position: relative;  
+  transition: max-height 0.5s ease-in-out;
+  margin-bottom: 20px; /* Add margin to separate cards */
+}
+.category-title {
+  font-size: 14px;  
+  font-weight: bold;
+  color: #4CAF50;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #4CAF50;
+}
+.character-card > .category-title:first-of-type {
+    margin-top: 0;
+}
+header button {
+  height: 40px;  
+  padding: 0 15px; /* 稍微減少 padding */
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 14px;  
+  margin: 5px; /* 增加 margin 以應對換行 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap; /* 防止按鈕文字換行 */
+}
+#generateBtn {
+    background-color: #4CAF50;
+    color: white;
+}
+#specificGenerateBtn {
+    background-color: #FF9800;
+    color: white;
+}
+#exportBtn, #importBtn {
+    background-color: #607D8B;
+    color: white;
+}
+header button:hover {
+    opacity: 0.8;
+}
+.card-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
     display: flex;
-    justify-content: center;
-    padding: 100px 20px 20px 20px; /* 增加頂部 padding 以免內容被 header 蓋住 */
-    font-size: 14px;  
-  }
-  .container {
-    text-align: center;
-  }
-  .character-card {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 0;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    text-align: left;
-    flex: 1 1 400px;
-    min-width: 400px;
-    max-width: 100%; /* 防止卡片在 flex 佈局中變得過寬 */
-    line-height: 1.8;
-    position: relative;  
-    transition: max-height 0.5s ease-in-out;
-    margin-bottom: 20px; /* Add margin to separate cards */
-  }
-  .category-title {
-    font-size: 14px;  
-    font-weight: bold;
-    color: #4CAF50;
-    margin-top: 16px;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #4CAF50;
-  }
-  .character-card > .category-title:first-of-type {
-      margin-top: 0;
-  }
-  header button {
-    height: 40px;  
-    padding: 0 15px; /* 稍微減少 padding */
+    gap: 5px;
+}
+.card-actions button {
+    width: auto;
+    height: auto;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: white;
     border: none;
     border-radius: 0;
     cursor: pointer;
-    font-size: 14px;  
-    margin: 5px; /* 增加 margin 以應對換行 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap; /* 防止按鈕文字換行 */
-  }
-  #generateBtn {
-      background-color: #4CAF50;
-      color: white;
-  }
-  #specificGenerateBtn {
-      background-color: #FF9800;
-      color: white;
-  }
-  #exportBtn, #importBtn {
-      background-color: #607D8B;
-      color: white;
-  }
-  header button:hover {
-      opacity: 0.8;
-  }
-  .card-actions {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      display: flex;
-      gap: 5px;
-  }
-  .card-actions button {
-      width: auto;
-      height: auto;
-      padding: 5px 10px;
-      font-size: 12px;
-      color: white;
-      border: none;
-      border-radius: 0;
-      cursor: pointer;
-  }
-  .card-actions .delete-btn {
-      background-color: #f44336;
-  }
-  .card-actions .save-btn {
-      background-color: #008CBA;
-  }
-  .card-actions .toggle-collapse-btn {
-      background-color: #9E9E9E;
-  }
-  .card-actions .copy-btn {
-      background-color: #2196F3;
-  }
-  /* New button style */
-  .card-actions .generate-prayer-btn {
-      background-color: #8E24AA; /* Purple */
-  }
-  .editable-field {
-      border: 1px solid transparent;
-      padding: 2px 4px;
-      border-radius: 0;
-      width: 250px;  
-      background-color: transparent;
-      font-size: 14px;
-      font-family: inherit;
-      transition: border-color 0.3s, background-color 0.3s;
-  }
-  .editable-field:focus {
-      outline: none;
-      border-color: #4CAF50;
-      background-color: #f9f9f9;
-  }
-  .character-card.collapsed .collapsible-content {
-      display: none;
-  }
-  /* New style for prayer content */
-  .prayer-content-box {
-      background-color: #e8f5e9; /* Light green */
-      border: 1px dashed #4CAF50;
-      padding: 10px;
-      margin-top: 15px;
-      text-align: left;
-      white-space: pre-wrap; /* Preserve whitespace and line breaks */
-      font-style: italic;
-      color: #333;
-      word-break: break-word; /* 避免長禱告文溢出 */
-  }
-  .prayer-loading {
-      font-style: italic;
-      color: #666;
-  }
-  
-  /* **新增**：響應式設計 (RWD) */
-  @media (max-width: 768px) {
-      body {
-          padding-top: 160px; /* 增加 header 空間，因為按鈕可能會換成兩行 */
-      }
-      .character-card {
-          min-width: 100%;
-          flex-basis: 100%;
-      }
-      .editable-field {
-          width: 100%;
-      }
-  }
-  /* 新增：禱告日誌列表樣式 */
-.prayer-content-box {
+}
+.card-actions .delete-btn {
+    background-color: #f44336;
+}
+.card-actions .save-btn {
+    background-color: #008CBA;
+}
+.card-actions .toggle-collapse-btn {
+    background-color: #9E9E9E;
+}
+.card-actions .copy-btn {
+    background-color: #2196F3;
+}
+/* New button style */
+.card-actions .generate-prayer-btn {
+    background-color: #8E24AA; /* Purple */
+}
+.editable-field {
+    border: 1px solid transparent;
+    padding: 2px 4px;
+    border-radius: 0;
+    width: 250px;  
+    background-color: transparent;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.3s, background-color 0.3s;
+}
+.editable-field:focus {
+    outline: none;
+    border-color: #4CAF50;
     background-color: #f9f9f9;
+}
+.character-card.collapsed .collapsible-content {
+    display: none;
+}
+.prayer-loading {
+    font-style: italic;
+    color: #666;
+}
+
+/* 響應式設計 (RWD) */
+@media (max-width: 768px) {
+    body {
+        padding-top: 160px; /* 增加 header 空間，因為按鈕可能會換成兩行 */
+    }
+    .character-card {
+        min-width: 100%;
+        flex-basis: 100%;
+    }
+    .editable-field {
+        width: 100%;
+    }
+}
+
+/* 禱告日誌列表樣式 */
+.prayer-content-box {
+    background-color: #fff0f3; 
     border: 1px solid #eee;
     padding: 10px;
     margin-top: 15px;
     text-align: left;
-    max-height: 400px; /* 設定最大高度 */
-    overflow-y: auto;  /* 超出高度時顯示滾動條 */
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .prayer-item {
     border-bottom: 1px dashed #ccc;
-    padding: 10px 0;
-    margin-bottom: 10px;
+    padding-bottom: 10px; 
+    margin-bottom: 10px; 
 }
 
 .prayer-item:last-child {
@@ -167,15 +156,40 @@ body {
     padding-bottom: 0;
 }
 
+/* **新增**: 禱告標頭容器 */
+.prayer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px; /* 標頭和禱告文之間的距離 */
+}
+
 .prayer-timestamp {
     font-size: 12px;
     color: #888;
-    margin-bottom: 5px;
     font-weight: bold;
+}
+
+/* **新增**: 單則禱告的複製按鈕 */
+.prayer-copy-btn {
+    background-color: #a0a0a0; /* 灰色 */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.prayer-copy-btn:hover {
+    background-color: #616161;
 }
 
 .prayer-text {
     white-space: pre-wrap;
-    font-style: italic;
-    color: #333;
+    font-style: normal;  
+    font-weight: normal; 
+    color: #000;         
+    line-height: 1.6;    
 }

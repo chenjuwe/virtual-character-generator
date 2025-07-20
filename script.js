@@ -154,7 +154,7 @@ function generateRandomCharacter(isSpecific = false) {
             id: Date.now() + Math.random(),
             nickname: sample(db.christianNicknames),
             emailPrefix: emailPrefix,
-            prayers: [] // **修改**: 初始化為空的禱告陣列
+            prayers: [] 
         };
     }
 
@@ -277,20 +277,19 @@ function generateRandomCharacter(isSpecific = false) {
         humorType: sample(db.humorTypeOptions),
         symbolicItem: sample(db.symbolicItemOptions),
         habitAction: sample(db.habitActionOptions),
-        prayers: [] // **修改**: 初始化為空的禱告陣列
+        prayers: [] 
     };
 }
 
-// **新增**: 專門用來渲染禱告列表的輔助函式
+// **修改**: 專門用來渲染禱告列表的輔助函式
 function renderPrayerList(container, prayers) {
-    container.innerHTML = ''; // 先清空
+    container.innerHTML = ''; 
 
     if (!prayers || prayers.length === 0) {
         container.innerHTML = '點擊「生成禱告」按鈕，讓 AI 為這個人物寫出禱告文。';
         return;
     }
 
-    // 依時間倒序排列 (最新的在最上面)
     const sortedPrayers = prayers.slice().sort((a, b) => b.timestamp - a.timestamp);
 
     sortedPrayers.forEach(prayer => {
@@ -305,11 +304,37 @@ function renderPrayerList(container, prayers) {
             minute: '2-digit'
         });
 
+        // **修改**: 加入複製按鈕
         prayerItem.innerHTML = `
-            <div class="prayer-timestamp">${prayerDate}</div>
+            <div class="prayer-header">
+                <div class="prayer-timestamp">${prayerDate}</div>
+                <button class="prayer-copy-btn">複製</button>
+            </div>
             <div class="prayer-text">${prayer.text}</div>
         `;
         container.appendChild(prayerItem);
+
+        // **新增**: 為複製按鈕綁定事件
+        const copyBtn = prayerItem.querySelector('.prayer-copy-btn');
+        copyBtn.addEventListener('click', () => {
+            const textToCopy = prayer.text;
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '已複製!';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('無法複製禱告文: ', err);
+                alert('複製失敗，您的瀏覽器可能不支援此功能。');
+            }
+            document.body.removeChild(textArea);
+        });
     });
 }
 
@@ -406,10 +431,9 @@ function renderCard(character, isSaved = false) {
         </div>
         <div class="category-title" style="margin-top: 20px;">AI 生成禱告文</div>
         <div class="prayer-content-box">
-            </div>
+        </div>
     `;
     
-    // **修改**: 渲染禱告列表
     const prayerBox = card.querySelector('.prayer-content-box');
     renderPrayerList(prayerBox, character.prayers);
 
@@ -420,10 +444,9 @@ function renderCard(character, isSaved = false) {
         container.prepend(card);
     }
 
-    // 將 debounce 應用於 editable-field 的 input 事件
     const debouncedUpdate = debounce((id, field, value) => {
         updateDisplayedCharacter(id, field, value);
-    }, 300); // 300ms 延遲
+    }, 300); 
 
     card.querySelectorAll('.editable-field').forEach(input => {
         input.addEventListener('input', (e) => {
@@ -456,17 +479,14 @@ function renderCard(character, isSaved = false) {
         try {
             const prayerText = await generateSelfPrayerContent(character);
             
-            // **修改**: 將新禱告加入陣列並儲存
             const newPrayer = { text: prayerText, timestamp: Date.now() };
-            if (!character.prayers) { // 確保 prayers 陣列存在
+            if (!character.prayers) { 
                 character.prayers = [];
             }
             character.prayers.push(newPrayer);
             
-            // 更新並儲存整個 prayers 陣列
             updateDisplayedCharacter(character.id, 'prayers', character.prayers); 
             
-            // 重新渲染禱告列表
             renderPrayerList(prayerBox, character.prayers);
 
         } catch (error) {
@@ -478,12 +498,10 @@ function renderCard(character, isSaved = false) {
     });
 }
 
-// 複製所有資訊 (包含禱告文)
 function copyCharacterInfo(characterId) {
     const character = displayedCharacters.find(char => char.id == characterId);
     if (!character) return;
 
-    // **修改**: 格式化禱告列表以供複製
     let prayersToCopy = '尚未生成禱告內容。';
     if (character.prayers && character.prayers.length > 0) {
         const sortedPrayers = character.prayers.slice().sort((a, b) => b.timestamp - a.timestamp);
@@ -573,7 +591,6 @@ function updateDisplayedCharacter(characterId, field, value) {
     if (character) {
         character[field] = value;
 
-        // Only update local storage if the character is saved
         const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         const charIndex = savedCharacters.findIndex(char => char.id == characterId);
         if (charIndex > -1) {
@@ -632,21 +649,17 @@ function deleteCharacter(characterId) {
 function loadSavedCharacters() {
     let savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
 
-    // **新增**: 資料轉換/遷移邏輯
-    // 檢查是否有舊格式的資料 (prayerContent 是字串) 並轉換它
     let needsResave = false;
     savedCharacters.forEach(character => {
         if (character.prayerContent && typeof character.prayerContent === 'string') {
             character.prayers = [{ text: character.prayerContent, timestamp: Date.now() }];
-            delete character.prayerContent; // 刪除舊的欄位
+            delete character.prayerContent; 
             needsResave = true;
         } else if (!character.prayers) {
-            // 如果連 prayers 欄位都沒有，就給一個空的
             character.prayers = [];
         }
     });
 
-    // 如果進行了轉換，就將新格式存回 localStorage
     if (needsResave) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
     }
