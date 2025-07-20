@@ -1,144 +1,851 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>虛擬人物自動生成器 (個人雲端版)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Noto Sans TC', sans-serif; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.5rem; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .modal-overlay { transition: opacity 0.3s ease; }
-        .modal-content { transition: transform 0.3s ease; }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-800">
-
-<div class="container mx-auto p-4 sm:p-6 lg:p-8">
-    <header class="text-center mb-8">
-        <h1 class="text-3xl sm:text-4xl font-bold text-gray-700">虛擬人物自動生成器</h1>
-        <p class="text-gray-500 mt-2">您的資料將被即時儲存至您的個人雲端，可在任何裝置上同步存取。</p>
-    </header>
-
-    <div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md flex justify-center space-x-4 mb-8">
-        <button id="generateBtn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200" disabled>
-            新增一位人物
-        </button>
-        <button id="clearBtn" class="bg-red-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200" disabled>
-            全部刪除
-        </button>
-    </div>
-
-    <div id="status" class="text-center text-gray-500 my-4">正在連接您的雲端資料庫...</div>
-    <div id="userIdDisplay" class="text-center text-gray-400 text-xs my-2"></div>
-
-    <main id="character-grid" class="card-grid"><!-- 角色卡片 --></main>
-
-    <footer class="text-center mt-12 text-gray-400 text-sm">此資料庫由 AI 生成，僅供參考。</footer>
-</div>
-
-<!-- 禱告內容 Modal -->
-<div id="prayerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-    <div id="modalOverlay" class="absolute inset-0 bg-black bg-opacity-50 modal-overlay"></div>
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col modal-content transform scale-95">
-        <div class="flex justify-between items-center p-4 border-b">
-            <h3 id="modalTitle" class="text-lg font-bold text-gray-800">禱告內容</h3>
-            <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        </div>
-        <div class="p-6 overflow-y-auto"><p id="prayerContent" class="text-gray-700 whitespace-pre-wrap leading-relaxed"></p></div>
-        <div class="p-4 border-t flex justify-end">
-            <button id="copyPrayerBtn" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-200">複製內容</button>
-        </div>
-    </div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, writeBatch, doc, serverTimestamp, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyC0_B_n_stXFqrBd2KPoEHc4pr8Bpd4rlQ",
-        authDomain: "virtual-character-generator.firebaseapp.com",
-        projectId: "virtual-character-generator",
-        storageBucket: "virtual-character-generator.appspot.com",
-        messagingSenderId: "492764039412",
-        appId: "1:492764039412:web:fe05d1755c85b95faf6a1",
-        measurementId: "G-N5EPNFRHJN"
-    };
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    // 啟用離線快取
-    enableIndexedDbPersistence(db).catch(err => console.warn("離線快取失敗:", err.code));
-
-    // 本地持久化匿名登入
-    setPersistence(auth, browserLocalPersistence)
-        .then(() => signInAnonymously(auth))
-        .catch(err => console.error("匿名登入失敗:", err));
-
-    const dataPools = { /* 原始 dataPools 全部複製貼上 */ };
-    const choice = arr => arr[Math.floor(Math.random() * arr.length)];
-    const randint = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-    function generateCharacter() { /* 原始 generateCharacter 函式 */ }
-    function generatePrayerFromTemplate(character) { /* 原始 generatePrayerFromTemplate 函式 */ }
-
-    let allGeneratedCharacters = [];
-    let charactersCollection;
-    const generateBtn = document.getElementById('generateBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const grid = document.getElementById('character-grid');
-    const statusDiv = document.getElementById('status');
-    const userIdDisplay = document.getElementById('userIdDisplay');
-    const modal = document.getElementById('prayerModal');
-    const modalOverlay = document.getElementById('modalOverlay');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const modalTitle = document.getElementById('modalTitle');
-    const prayerContent = document.getElementById('prayerContent');
-    const copyPrayerBtn = document.getElementById('copyPrayerBtn');
-
-    function updateStatus() {
-        statusDiv.textContent = allGeneratedCharacters.length
-            ? `目前雲端資料庫中總共有 ${allGeneratedCharacters.length} 位人物。`
-            : '雲端資料庫是空的，請生成新的人物。';
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>虛擬人物特徵生成器 (修正版)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f7fa;
+      display: flex;
+      justify-content: center;
+      padding: 80px 20px 20px 20px;
+      font-size: 14px;  
     }
-    function openModal() { modal.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); setTimeout(() => { modalOverlay.classList.remove('opacity-0'); modal.querySelector('.modal-content').classList.remove('scale-95'); }, 10); }
-    function closeModal() { modalOverlay.classList.add('opacity-0'); modal.querySelector('.modal-content').classList.add('scale-95'); setTimeout(() => { modal.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }, 300); }
+    .container {
+      text-align: center;
+    }
+    .character-card {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 0;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: left;
+      flex: 1 1 400px;
+      min-width: 400px;
+      line-height: 1.8;
+      position: relative;  
+      transition: max-height 0.5s ease-in-out;
+      margin-bottom: 20px; /* Add margin to separate cards */
+    }
+    .category-title {
+      font-size: 14px;  
+      font-weight: bold;
+      color: #4CAF50;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #4CAF50;
+    }
+    .character-card > .category-title:first-of-type {
+        margin-top: 0;
+    }
+    header button {
+      height: 40px;  
+      padding: 0 20px;
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+      font-size: 14px;  
+      margin: 0 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #generateBtn {
+        background-color: #4CAF50;
+        color: white;
+    }
+    #specificGenerateBtn {
+        background-color: #FF9800;
+        color: white;
+    }
+    #exportBtn, #importBtn {
+        background-color: #607D8B;
+        color: white;
+    }
+    header button:hover {
+        opacity: 0.8;
+    }
+    .card-actions {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 5px;
+    }
+    .card-actions button {
+        width: auto;
+        height: auto;
+        padding: 5px 10px;
+        font-size: 12px;
+        color: white;
+        border: none;
+        border-radius: 0;
+        cursor: pointer;
+    }
+    .card-actions .delete-btn {
+        background-color: #f44336;
+    }
+    .card-actions .save-btn {
+        background-color: #008CBA;
+    }
+    .card-actions .toggle-collapse-btn {
+        background-color: #9E9E9E;
+    }
+    .card-actions .copy-btn {
+        background-color: #2196F3;
+    }
+    /* New button style */
+    .card-actions .generate-prayer-btn {
+        background-color: #8E24AA; /* Purple */
+    }
+    .editable-field {
+        border: 1px solid transparent;
+        padding: 2px 4px;
+        border-radius: 0;
+        width: 250px;  
+        background-color: transparent;
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.3s, background-color 0.3s;
+    }
+    .editable-field:focus {
+        outline: none;
+        border-color: #4CAF50;
+        background-color: #f9f9f9;
+    }
+    .character-card.collapsed .collapsible-content {
+        display: none;
+    }
+    /* New style for prayer content */
+    .prayer-content-box {
+        background-color: #e8f5e9; /* Light green */
+        border: 1px dashed #4CAF50;
+        padding: 10px;
+        margin-top: 15px;
+        text-align: left;
+        white-space: pre-wrap; /* Preserve whitespace and line breaks */
+        font-style: italic;
+        color: #333;
+    }
+    .prayer-loading {
+        font-style: italic;
+        color: #666;
+    }
+  </style>
+</head>
+<body>
+  <header style="position: fixed; top: 0; width: 100%; background-color: #ffffff; padding: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+    <button id="generateBtn">✨ 生成新人物</button>
+    <button id="specificGenerateBtn">生成指定人物</button>
+    <button id="exportBtn">匯出存檔 (.json)</button>
+    <button id="importBtn">匯入存檔 (.json)</button>
+    <input type="file" id="fileInput" accept=".json" style="display: none;">
+  </header>
+  <div class="container" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; align-items: flex-start;"></div>
 
-    closeModalBtn.addEventListener('click', closeModal);
-    modalOverlay.addEventListener('click', closeModal);
-    copyPrayerBtn.addEventListener('click', () => { /* 原始複製處理 */ });
+<script>
+const STORAGE_KEY = 'savedChristianCharacters';
+let displayedCharacters = []; 
 
-    function handleCardClick(character) { /* 原始 handleCardClick */ }
+// 輔助函式：從陣列中隨機取樣一個元素
+function sample(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-    generateBtn.addEventListener('click', async () => { /* 原始新增程式 */ });
-    clearBtn.addEventListener('click', async () => { /* 原始清除程式 */ });
+// ** 新增函式 **：產生一個隨機生日 (YYYY-MM-DD)
+function generateRandomBirthday() {
+  const year = Math.floor(Math.random() * (2004 - 1975 + 1)) + 1975;
+  const month = Math.floor(Math.random() * 12) + 1;
+  const day = Math.floor(Math.random() * 28) + 1;  
+  const monthStr = String(month).padStart(2, '0');
+  const dayStr = String(day).padStart(2, '0');
+  return `${year}-${monthStr}-${dayStr}`;
+}
 
-    function renderAllCards(chars) { /* 原始 renderAllCards */ }
+// ** 已修改 **：函式只負責生成中文名與對應的拼音名
+function generateChineseNameWithPinyin() {
+  const surnames = [
+    { chinese: "陳", pinyin: "Chen" }, { chinese: "林", pinyin: "Lin" }, { chinese: "張", pinyin: "Chang" }, { chinese: "李", pinyin: "Li" }, { chinese: "王", pinyin: "Wang" }, { chinese: "黃", pinyin: "Huang" }, { chinese: "吳", pinyin: "Wu" }, { chinese: "劉", pinyin: "Liu" }, { chinese: "蔡", pinyin: "Tsai" }, { chinese: "楊", pinyin: "Yang" }, { chinese: "許", pinyin: "Hsu" }, { chinese: "鄭", pinyin: "Cheng" }, { chinese: "謝", pinyin: "Hsieh" }, { chinese: "郭", pinyin: "Kuo" }, { chinese: "洪", pinyin: "Hung" }, { chinese: "曾", pinyin: "Tseng" }, { chinese: "邱", pinyin: "Chiu" }, { chinese: "廖", pinyin: "Liao" }, { chinese: "賴", pinyin: "Lai" }, { chinese: "周", pinyin: "Chou" }, { chinese: "徐", pinyin: "Hsu" }, { chinese: "蘇", pinyin: "Su" }, { chinese: "葉", pinyin: "Yeh" }, { chinese: "莊", pinyin: "Chuang" }, { chinese: "江", pinyin: "Chiang" }, { chinese: "何", pinyin: "Ho" }, { chinese: "蕭", pinyin: "Hsiao" }, { chinese: "羅", pinyin: "Lo" }, { chinese: "高", pinyin: "Kao" }, { chinese: "簡", pinyin: "Chien" }, { chinese: "朱", pinyin: "Chu" }, { chinese: "鍾", pinyin: "Chung" }, { chinese: "施", pinyin: "Shih" }, { chinese: "游", pinyin: "Yu" }, { chinese: "詹", pinyin: "Chan" }, { chinese: "沈", pinyin: "Shen" }, { chinese: "彭", pinyin: "Peng" }, { chinese: "胡", pinyin: "Hu" }, { chinese: "余", pinyin: "Yu" }, { chinese: "盧", pinyin: "Lu" }, { chinese: "潘", pinyin: "Pan" }, { chinese: "顏", pinyin: "Yen" }, { chinese: "梁", pinyin: "Liang" }, { chinese: "趙", pinyin: "Chao" }, { chinese: "柯", pinyin: "Ko" }, { chinese: "翁", pinyin: "Weng" }, { chinese: "魏", pinyin: "Wei" }, { chinese: "方", pinyin: "Fang" }, { chinese: "孫", pinyin: "Sun" }, { chinese: "田", pinyin: "Tien" }, { chinese: "呂", pinyin: "Lu" }, { chinese: "程", pinyin: "Cheng" }, { chinese: "宋", pinyin: "Sung" }, { chinese: "范", pinyin: "Fan" }, { chinese: "馬", pinyin: "Ma" }, { chinese: "董", pinyin: "Tung" }, { chinese: "曹", pinyin: "Tsao" }, { chinese: "杜", pinyin: "Tu" }, { chinese: "薛", pinyin: "Hsueh" }, { chinese: "丁", pinyin: "Ting" }, { chinese: "石", pinyin: "Shih" }, { chinese: "姜", pinyin: "Chiang" }, { chinese: "邵", pinyin: "Shao" }, { chinese: "鄧", pinyin: "Teng" }, { chinese: "侯", pinyin: "Hou" }, { chinese: "姚", pinyin: "Yao" }, { chinese: "孟", pinyin: "Meng" }, { chinese: "傅", pinyin: "Fu" }, { chinese: "段", pinyin: "Tuan" }, { chinese: "雷", pinyin: "Lei" }, { chinese: "錢", pinyin: "Chien" }, { chinese: "龍", pinyin: "Lung" }, { chinese: "史", pinyin: "Shih" }, { chinese: "陶", pinyin: "Tao" }, { chinese: "黎", pinyin: "Li" }, { chinese: "賀", pinyin: "Ho" }, { chinese: "顧", pinyin: "Ku" }, { chinese: "毛", pinyin: "Mao" }, { chinese: "郝", pinyin: "Hao" }, { chinese: "龔", pinyin: "Kung" }, { chinese: "嚴", pinyin: "Yen" }, { chinese: "白", pinyin: "Pai" }, { chinese: "童", pinyin: "Tung" }, { chinese: "尹", pinyin: "Yin" }, { chinese: "孔", pinyin: "Kung" }, { chinese: "湯", pinyin: "Tang" }, { chinese: "康", pinyin: "Kang" }, { chinese: "溫", pinyin: "Wen" }, { chinese: "紀", pinyin: "Chi" }, { chinese: "姚", pinyin: "Yao" },
+    { chinese: "歐陽", pinyin: "Ouyang" }, { chinese: "司馬", pinyin: "Sima" }, { chinese: "諸葛", pinyin: "Zhuge" }, { chinese: "上官", pinyin: "Shangguan" }, { chinese: "公孫", pinyin: "Gongsun" }, { chinese: "夏侯", pinyin: "Hsiahou" }, { chinese: "皇甫", pinyin: "Huangfu" }, { chinese: "尉遲", pinyin: "Yuchi" }, { chinese: "申屠", pinyin: "Shentu" }, { chinese: "端木", pinyin: "Tuanmu" }
+  ];
+  const givenNameChar1 = [
+    { chinese: "家", pinyin: "Chia" }, { chinese: "志", pinyin: "Chih" }, { chinese: "俊", pinyin: "Chun" }, { chinese: "冠", pinyin: "Kuan" }, { chinese: "彥", pinyin: "Yen" }, { chinese: "承", pinyin: "Cheng" }, { chinese: "宇", pinyin: "Yu" }, { chinese: "宗", pinyin: "Tsung" }, { chinese: "哲", pinyin: "Che" }, { chinese: "柏", pinyin: "Po" }, { chinese: "廷", pinyin: "Ting" }, { chinese: "文", pinyin: "Wen" }, { chinese: "國", pinyin: "Kuo" }, { chinese: "建", pinyin: "Chien" }, { chinese: "宏", pinyin: "Hung" }, { chinese: "德", pinyin: "Te" }, { chinese: "明", pinyin: "Ming" }, { chinese: "翰", pinyin: "Han" }, { chinese: "聖", pinyin: "Sheng" }, { chinese: "凱", pinyin: "Kai" }, { chinese: "佑", pinyin: "Yu" }, { chinese: "威", pinyin: "Wei" }, { chinese: "毅", pinyin: "Yi" }, { chinese: "翔", pinyin: "Hsiang" }, { chinese: "豪", pinyin: "Hao" }, { chinese: "倫", pinyin: "Lun" }, { chinese: "軒", pinyin: "Hsuan" }, { chinese: "睿", pinyin: "Jui" }, { chinese: "恩", pinyin: "En" }, { chinese: "品", pinyin: "Pin" }, { chinese: "奕", pinyin: "Yi" }, { chinese: "紹", pinyin: "Shao" }, { chinese: "鈞", pinyin: "Chun" }, { chinese: "宸", pinyin: "Chen" }, { chinese: "浩", pinyin: "Hao" }, { chinese: "偉", pinyin: "Wei" }, { chinese: "達", pinyin: "Ta" }, { chinese: "龍", pinyin: "Lung" }, { chinese: "誠", pinyin: "Cheng" }, { chinese: "陽", pinyin: "Yang" }, { chinese: "泰", pinyin: "Tai" }, { chinese: "祥", pinyin: "Hsiang" }, { chinese: "耀", pinyin: "Yao" }, { chinese: "勛", pinyin: "Hsun" }, { chinese: "安", pinyin: "An" }, { chinese: "華", pinyin: "Hua" }, { chinese: "鎮", pinyin: "Chen" }, { chinese: "瑞", pinyin: "Jui" }, { chinese: "豐", pinyin: "Feng" }, { chinese: "耀", pinyin: "Yao" },
+    { chinese: "佳", pinyin: "Chia" }, { chinese: "宜", pinyin: "Yi" }, { chinese: "雅", pinyin: "Ya" }, { chinese: "詩", pinyin: "Shih" }, { chinese: "欣", pinyin: "Hsin" }, { chinese: "慧", pinyin: "Hui" }, { chinese: "心", pinyin: "Hsin" }, { chinese: "詠", pinyin: "Yung" }, { chinese: "嘉", pinyin: "Chia" }, { chinese: "佩", pinyin: "Pei" }, { chinese: "珊", pinyin: "Shan" }, { chinese: "琪", pinyin: "Chi" }, { chinese: "芬", pinyin: "Fen" }, { chinese: "芳", pinyin: "Fang" }, { chinese: "琳", pinyin: "Lin" }, { chinese: "靜", pinyin: "Ching" }, { chinese: "惠", pinyin: "Hui" }, { chinese: "敏", pinyin: "Min" }, { chinese: "秀", pinyin: "Hsiu" }, { chinese: "麗", pinyin: "Li" }, { chinese: "娜", pinyin: "Na" }, { chinese: "莉", pinyin: "Li" }, { chinese: "蓉", pinyin: "Jung" }, { chinese: "儀", pinyin: "Yi" }, { chinese: "婷", pinyin: "Ting" }, { chinese: "穎", pinyin: "Ying" }, { chinese: "姿", pinyin: "Tzu" }, { chinese: "娟", pinyin: "Chuan" }, { chinese: "玲", pinyin: "Ling" }, { chinese: "珍", pinyin: "Chen" }, { chinese: "妮", pinyin: "Ni" }, { chinese: "婉", pinyin: "Wan" }, { chinese: "柔", pinyin: "Jou" }, { chinese: "綺", pinyin: "Chi" }, { chinese: "毓", pinyin: "Yu" }, { chinese: "晴", pinyin: "Ching" }, { chinese: "涵", pinyin: "Han" }, { chinese: "萱", pinyin: "Hsuan" }, { chinese: "喬", pinyin: "Chiao" }, { chinese: "芸", pinyin: "Yun" }, { chinese: "舒", pinyin: "Shu" }, { chinese: "語", pinyin: "Yu" }, { chinese: "彤", pinyin: "Tung" }, { chinese: "寧", pinyin: "Ning" }, { chinese: "潔", pinyin: "Chieh" }, { chinese: "璇", pinyin: "Hsuan" }, { chinese: "悅", pinyin: "Yueh" }, { chinese: "茜", pinyin: "Chien" }, { chinese: "帆", pinyin: "Fan" }, { chinese: "馨", pinyin: "Hsin" }
+  ];
+  const givenNameChar2 = [
+    { chinese: "傑", pinyin: "Chieh" }, { chinese: "豪", pinyin: "Hao" }, { chinese: "翔", pinyin: "Hsiang" }, { chinese: "霖", pinyin: "Lin" }, { chinese: "倫", pinyin: "Lun" }, { chinese: "鋒", pinyin: "Feng" }, { chinese: "翰", pinyin: "Han" }, { chinese: "宇", pinyin: "Yu" }, { chinese: "儒", pinyin: "Ju" }, { chinese: "毅", pinyin: "Yi" }, { chinese: "軒", pinyin: "Hsuan" }, { chinese: "澤", pinyin: "Tse" }, { chinese: "彥", pinyin: "Yen" }, { chinese: "恩", pinyin: "En" }, { chinese: "佑", pinyin: "Yu" }, { chinese: "銘", pinyin: "Ming" }, { chinese: "凱", pinyin: "Kai" }, { chinese: "誠", pinyin: "Cheng" }, { chinese: "叡", pinyin: "Jui" }, { chinese: "陽", pinyin: "Yang" }, { chinese: "廷", pinyin: "Ting" }, { chinese: "鈞", pinyin: "Chun" }, { chinese: "辰", pinyin: "Chen" }, { chinese: "齊", pinyin: "Chi" }, { chinese: "安", pinyin: "An" }, { chinese: "帆", pinyin: "Fan" }, { chinese: "達", pinyin: "Ta" }, { chinese: "賢", pinyin: "Hsien" }, { chinese: "彬", pinyin: "Pin" }, { chinese: "謙", pinyin: "Chien" }, { chinese: "元", pinyin: "Yuan" }, { chinese: "甫", pinyin: "Fu" }, { chinese: "逸", pinyin: "Yi" }, { chinese: "丞", pinyin: "Cheng" }, { chinese: "諺", pinyin: "Yen" }, { chinese: "勳", pinyin: "Hsun" }, { chinese: "哲", pinyin: "Che" }, { chinese: "瑋", pinyin: "Wei" }, { chinese: "漢", pinyin: "Han" }, { chinese: "德", pinyin: "Te" }, { chinese: "霖", pinyin: "Lin" }, { chinese: "宏", pinyin: "Hung" }, { chinese: "毅", pinyin: "Yi" }, { chinese: "華", pinyin: "Hua" }, { chinese: "文", pinyin: "Wen" }, { chinese: "平", pinyin: "Ping" }, { chinese: "光", pinyin: "Kuang" }, { chinese: "中", pinyin: "Chung" }, { chinese: "信", pinyin: "Hsin" }, { chinese: "維", pinyin: "Wei" },
+    { chinese: "婷", pinyin: "Ting" }, { chinese: "萱", pinyin: "Hsuan" }, { chinese: "涵", pinyin: "Han" }, { chinese: "儀", pinyin: "Yi" }, { chinese: "玲", pinyin: "Ling" }, { chinese: "穎", pinyin: "Ying" }, { chinese: "琳", pinyin: "Lin" }, { chinese: "珍", pinyin: "Chen" }, { chinese: "娜", pinyin: "Na" }, { chinese: "莉", pinyin: "Li" }, { chinese: "蓉", pinyin: "Jung" }, { chinese: "娟", pinyin: "Chuan" }, { chinese: "芳", pinyin: "Fang" }, { chinese: "芬", pinyin: "Fen" }, { chinese: "慧", pinyin: "Hui" }, { chinese: "敏", pinyin: "Min" }, { chinese: "秀", pinyin: "Hsiu" }, { chinese: "麗", pinyin: "Li" }, { chinese: "雅", pinyin: "Ya" }, { chinese: "琪", pinyin: "Chi" }, { chinese: "珊", pinyin: "Shan" }, { chinese: "柔", pinyin: "Jou" }, { chinese: "綺", pinyin: "Chi" }, { chinese: "毓", pinyin: "Yu" }, { chinese: "晴", pinyin: "Ching" }, { chinese: "涵", pinyin: "Han" }, { chinese: "萱", pinyin: "Hsuan" }, { chinese: "喬", pinyin: "Chiao" }, { chinese: "芸", pinyin: "Yun" }, { chinese: "舒", pinyin: "Shu" }, { chinese: "語", pinyin: "Yu" }, { chinese: "彤", pinyin: "Tung" }, { chinese: "寧", pinyin: "Ning" }, { chinese: "潔", pinyin: "Chieh" }, { chinese: "璇", pinyin: "Hsuan" }, { chinese: "悅", pinyin: "Yueh" }, { chinese: "茜", pinyin: "Chien" }, { chinese: "帆", pinyin: "Fan" }, { chinese: "妮", pinyin: "Ni" }, { chinese: "霏", pinyin: "Fei" }, { chinese: "妤", pinyin: "Yu" }, { chinese: "安", pinyin: "An" }, { chinese: "潔", pinyin: "Chieh" }, { chinese: "欣", pinyin: "Hsin" }, { chinese: "瑤", pinyin: "Yao" }, { chinese: "靜", pinyin: "Ching" }, { chinese: "萍", pinyin: "Ping" }, { chinese: "霜", pinyin: "Shuang" }, { chinese: "霞", pinyin: "Hsia" }, { chinese: "燕", pinyin: "Yen" }, { chinese: "丹", pinyin: "Tan" }, { chinese: "蘭", pinyin: "Lan" }, { chinese: "馨", pinyin: "Hsin" }
+  ];
 
-    onAuthStateChanged(auth, user => {
-        if (user) {
-            const uid = user.uid;
-            userIdDisplay.textContent = `您的專屬雲端ID: ${uid}`;
-            charactersCollection = collection(db, `characters/${uid}/people`);
-            const q = query(charactersCollection, orderBy('createdAt', 'asc'));
-            onSnapshot(q, snap => {
-                allGeneratedCharacters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-                renderAllCards(allGeneratedCharacters);
-                updateStatus();
-            }, err => console.error('監聽失敗:', err));
-            generateBtn.disabled = false;
-            clearBtn.disabled = false;
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const surname = sample(surnames);
+  const isTwoCharGivenName = Math.random() > 0.3;  
+  
+  let givenNameChinese = '';
+  let givenNamePinyin = '';
+
+  const char1 = sample(givenNameChar1);
+  givenNameChinese += char1.chinese;
+  givenNamePinyin += capitalize(char1.pinyin);
+
+  if (isTwoCharGivenName) {
+    const char2 = sample(givenNameChar2);
+    givenNameChinese += char2.chinese;
+    givenNamePinyin += '-' + capitalize(char2.pinyin);
+  }
+
+  return {
+    chinese: surname.chinese + givenNameChinese,
+    pinyin: `${givenNamePinyin} ${surname.pinyin}`,
+    surnamePinyin: surname.pinyin,
+    surnameChinese: surname.chinese
+  };
+}
+
+// ** 全新函式 **：產生符合Gmail規範且多樣化的電子信箱前綴
+function generateGmailPrefix(englishName, birthYear) {
+  const colors = ["blue", "red", "green", "sky", "black", "white", "pink", "silver", "gold", "aqua", "azure", "beige", "brown", "chartreuse", "coral", "crimson", "cyan", "darkblue", "fuchsia", "ghostwhite", "gray", "grey", "indigo", "ivory", "khaki", "lavender", "lime", "linen", "magenta", "maroon", "moccasin", "navy", "olive", "orange", "orchid", "peru", "plum", "purple", "salmon", "sienna", "snow", "tan", "teal", "thistle", "tomato", "turquoise", "violet", "wheat", "yellow", "seagreen"];
+  const items = ["star", "sun", "moon", "cat", "dog", "fox", "skywalker", "coffee", "book", "cloud", "rain", "wind", "river", "ocean", "mountain", "tree", "flower", "leaf", "bird", "wolf", "lion", "tiger", "bear", "dragon", "phoenix", "castle", "sword", "shield", "arrow", "bow", "key", "lock", "ship", "anchor", "compass", "map", "pen", "quill", "scroll", "crystal", "gem", "ring", "crown", "throne", "gate", "bridge", "tower", "path", "dream", "shadow"];
+  const codes = ["x", "z", "alpha", "omega", "zero", "one", "agent", "code", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "ace", "king", "queen", "jack", "joker", "nova", "pulse", "echo", "matrix", "vector", "cypher", "glitch", "kernel", "node", "proxy", "script", "token", "vertex", "void", "zenith"];
+
+  let baseName = englishName.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, '.');
+
+  let prefix = '';
+  const pattern = Math.floor(Math.random() * 5);
+
+  switch (pattern) {
+    case 0: 
+      prefix = `${baseName}${birthYear}`;
+      break;
+    case 1: 
+      prefix = `${baseName}.${sample(colors)}`;
+      break;
+    case 2: 
+      prefix = `${sample(items)}.${baseName}`;
+      break;
+    case 3: 
+      const randomNumber1 = String(Math.floor(Math.random() * 90) + 10);
+      prefix = `${baseName}.${sample(codes)}${randomNumber1}`;
+      break;
+    case 4: 
+    default:
+      const randomNumber2 = String(Math.floor(Math.random() * 900) + 100);
+      prefix = `${baseName}${randomNumber2}`;
+      break;
+  }
+
+  prefix = prefix.replace(/\.{2,}/g, '.').replace(/^\.|\.$/g, '');
+
+  if (prefix.length > 30) {
+    prefix = prefix.substring(0, 30);
+  }
+  while (prefix.length < 6) {
+    prefix += String(Math.floor(Math.random() * 10));
+  }
+  
+  prefix = prefix.replace(/\.$/g, '');
+
+  return prefix;
+}
+
+
+function generateRandomCharacter(isSpecific = false) {
+    const specificCharacterData = {
+        chineseName: "孫珊",
+        englishName: "Shan Sun",
+        gender: "女性", // Changed to female for specific character
+        birthday: "1982-07-14 (43歲)",
+        location: "桃園",
+        transportation: "光陽 GP125",
+        healthCondition: "高血壓",
+        maritalStatus: "離婚",
+        familyBackground: "單親家庭",
+        education: "高中畢業",
+        occupation: "木工",
+        financialStatus: "中等收入",
+        futurePlan: "深造",
+        lifeGoal: "幫助他人",
+        story: "計畫在五年內環遊世界",
+        secret: "偷偷養了一隻寵物",
+        strengths: "創造力",
+        weaknesses: "健忘",
+        lifestyle: "早睡早起",
+        hobbies: "烹飪",
+        symbolicItem: "鋼筆",
+        habitAction: "敲手指",
+        denomination: "靈恩派",
+        churchRole: "宣教士",
+        favoriteVerse: "「愛是恆久忍耐，又有恩慈。」(林前 13:4)",
+        spiritualGift: "教導",
+        politicalView: "中立",
+        consumptionConcept: "極簡主義",
+        lifeView: "盡力而為",
+        wish: "財富自由",
+        socialMedia: "LinkedIn",
+        socialStyle: "外向",
+        learningStyle: "聽覺學習",
+        thinkingMode: "感性思維",
+        emotionManagement: "運動",
+        humorType: "自嘲型",
+        socialConcern: "動物權益",
+        leisureDepth: "深層沉浸",
+        children: [{name: "孫小花", age: 10}], // Added a child
+        spouseName: null,
+        spouseAge: null,
+    };
+
+    if (isSpecific) {
+        const christianNicknames = ["蒙恩的小羊", "為主發光的星", "仰望十架的鴿子", "曠野中的以利亞", "神國的好管家", "溪水旁的樹", "為主奔跑的人", "小小的芥菜種", "神的孩子", "光和鹽", "蒙愛的兒女", "和平之子", "溫柔的鴿子", "信心的勇士", "光明的使者", "撒瑪利亞人", "忠心的僕人", "磐石上的房子", "天國的子民", "基督的精兵", "良善的撒種人", "尋找迷羊的牧人", "警醒的守望者", "神殿的活石", "結果子的樹", "被揀選的族類", "有君尊的祭司", "聖潔的國度", "屬神的子民", "世上的光", "山上的城", "燈臺上的燈", "地上的鹽", "麥子", "葡萄樹的枝子", "新造的人", "與神和好者", "天國的鑰匙", "跟隨羔羊的人", "得勝者", "穿白衣的人", "生命冊上有名的", "神殿中的柱子", "晨星", "坐在寶座上的", "智慧之子", "公義的冠冕", "永生的盼望", "真理的柱石", "百合花", "清心的人", "溫柔的人", "哀慟的人", "飢渴慕義的人", "憐恤人的人", "使人和睦的人", "為義受逼迫的人", "神百般恩賜的好管家", "無愧的工人", "基督的馨香之氣", "一台戲", "世上的客旅", "寄居的", "光明之子", "白晝之子", "神的同工", "基督的使者", "天上的國民", "神的產業", "貴重的器皿", "聖潔的器皿", "合乎主用", "預備行各樣的善事", "基督的身體", "神的殿", "聖靈的殿", "神的家", "真理的教會", "永生神的教會", "神的羊", "草場上的羊", "大牧人手下的羊", "客旅", "神的選民", "聖潔的祭司", "被贖的民", "栽種的樹", "修理的葡萄園", "受膏者", "守約施慈愛的神", "以便以謝", "耶和華以勒", "耶和華尼西", "耶和華沙龍", "耶和華拉法", "耶和華齊根努", "耶和華沙瑪", "耶和華羅伊"];
+        const emailPrefix = generateGmailPrefix(specificCharacterData.englishName, "1982");
+        return {
+            ...specificCharacterData,
+            id: Date.now() + Math.random(),
+            nickname: sample(christianNicknames),
+            emailPrefix: emailPrefix,
+            prayerContent: "" 
+        };
+    }
+
+
+  const commonMaleNames = ["Michael", "Christopher", "Matthew", "Joshua", "David", "James", "John", "Robert", "Daniel", "William", "Joseph", "Jason", "Brian", "Kevin", "Eric", "Steven", "Andrew", "Justin", "Ryan", "Jeffrey", "Mark", "Paul", "Scott", "Thomas", "Anthony", "Kenneth", "Charles", "Richard", "George", "Edward", "Ronald", "Timothy", "Gary", "Larry", "Frank", "Donald", "Stephen", "Jerry", "Dennis", "Walter", "Patrick", "Peter", "Harold", "Douglas", "Henry", "Carl", "Arthur", "Roger", "Joe", "Jonathan"];
+  const commonFemaleNames = ["Jessica", "Jennifer", "Ashley", "Sarah", "Amanda", "Melissa", "Stephanie", "Nicole", "Elizabeth", "Heather", "Tiffany", "Kimberly", "Amy", "Michelle", "Mary", "Lisa", "Emily", "Megan", "Rebecca", "Laura", "Crystal", "Christina", "Kelly", "Angela", "Patricia", "Linda", "Barbara", "Susan", "Karen", "Nancy", "Donna", "Sandra", "Carol", "Sharon", "Deborah", "Kimberly", "Pamela", "Cynthia", "Brenda", "Maria", "Catherine", "Christine", "Helen", "Dorothy", "Shirley", "Margaret", "Ruth", "Virginia", "Anna", "Betty"];
+  const uncommonMaleNames = ["Caspian", "Orion", "Theron", "Zephyr", "Alistair", "Peregrine", "Leander", "Finnegan", "Stellan", "Cormac", "Lucian", "Torin", "Evander", "Killian", "Ronan", "Lachlan", "Rhys", "Soren", "Cassius", "Sterling", "Alaric", "Caius", "Kael", "Jaxon", "Bodhi", "Phoenix", "Axel", "Enzo", "Rocco", "Magnus", "Odin", "Thorin", "Blaise", "Dante", "Gideon", "Jasper", "Milo", "Silas", "Atticus", "Felix", "Hugo", "Oscar", "Otto", "Quentin", "Remus", "Rufus", "Titus", "Urban", "Victor", "Winston"];
+  const uncommonFemaleNames = ["Seraphina", "Calliope", "Persephone", "Ophelia", "Aurora", "Lyra", "Elara", "Wren", "Sable", "Indigo", "Juniper", "Willow", "Clementine", "Guinevere", "Isolde", "Rowena", "Fiona", "Maeve", "Niamh", "Saoirse", "Astrid", "Freya", "Ingrid", "Sigrid", "Annelise", "Beatrix", "Genevieve", "Aurelia", "Cassia", "Dahlia", "Elowen", "Ione", "Jessamine", "Lavender", "Magnolia", "Odessa", "Paloma", "Thea", "Xanthe", "Yara", "Zola", "Calista", "Demetria", "Evadne", "Galina", "Helia", "Ilaria", "Jocasta", "Kerenza"];
+
+  const occupations = {
+    all: ["軟體工程師", "資料科學家", "UI/UX 設計師", "網路安全分析師", "系統管理員", "DevOps 工程師", "產品經理", "前端開發人員", "後端開發人員", "全端開發人員", "雲端架構師", "人工智慧研究員", "區塊鏈開發者", "遊戲開發者", "IT 技術支援", "醫師", "外科醫生", "護理師", "藥劑師", "牙醫", "物理治療師", "心理諮商師", "獸醫", "營養師", "醫學檢驗師", "會計師", "金融分析師", "行銷經理", "人力資源經理", "執行長 (CEO)", "管理顧問", "投資銀行家", "審計師", "電子商務專家", "供應鏈經理", "不動產經紀人", "保險業務員", "企業家", "營運總監 (COO)", "財務長 (CFO)", "藝術家", "作家", "音樂家", "演員", "攝影師", "平面設計師", "電影導演", "編劇", "動畫師", "插畫家", "策展人", "時尚設計師", "舞者", "歌手", "配音員", "老師", "大學教授", "圖書館員", "校長", "學術研究員", "教育顧問", "特殊教育教師", "幼教老師", "補習班老師", "學務人員", "電工", "水管工", "木工", "廚師", "汽車技師", "理髮師", "美容師", "健身教練", "咖啡師", "飯店經理", "空服員", "導遊", "客服專員", "快遞員", "保全人員", "律師", "法官", "警察", "消防員", "社工", "公務員", "外交官", "軍人", "城市規劃師", "環保稽查員", "運動員", "農夫", "飛行員", "記者", "建築師", "口譯員", "科學家", "地質學家", "運動經紀人", "自由工作者"],
+    academic: ["大學教授", "學術研究員", "科學家", "資料科學家", "人工智慧研究員", "地質學家"],
+    nonDegree: ["電工", "水管工", "木工", "廚師", "汽車技師", "理髮師", "美容師", "咖啡師", "快遞員", "保全人員", "農夫", "司機"]
+  };
+  const educations = ["國中畢業", "高中畢業", "專科畢業", "五專畢業", "大學畢業", "二技畢業", "碩士", "博士", "博士後研究", "在職專班", "肄業"];
+  const locations = ["台北", "台中", "台南", "高雄", "桃園", "新北", "基隆", "新竹", "苗栗", "彰化", "南投", "雲林", "嘉義", "屏東", "宜蘭", "花蓮", "台東", "澎湖", "金門", "馬祖", "東京", "大阪", "京都", "首爾", "釜山", "曼谷", "新加坡", "吉隆坡", "雅加達", "馬尼拉", "河內", "香港", "澳門", "上海", "北京", "廣州", "深圳", "成都", "重慶", "雪梨", "墨爾本", "奧克蘭", "倫敦", "巴黎", "柏林", "羅馬", "馬德里", "阿姆斯特丹", "布魯塞爾", "維也納", "蘇黎世", "斯德哥爾摩", "奧斯陸", "哥本哈根", "赫爾辛基", "莫斯科", "伊斯坦堡", "杜拜", "開羅", "約翰尼斯堡", "奈洛比", "紐約", "洛杉磯", "芝加哥", "休士頓", "鳳凰城", "費城", "聖地牙哥", "達拉斯", "聖荷西", "奧斯汀", "傑克遜維爾", "舊金山", "印第安納波利斯", "哥倫布", "夏洛特", "西雅圖", "丹佛", "華盛頓特區", "波士頓", "底特律", "納什維爾", "孟菲斯", "波特蘭", "拉斯維加斯", "路易維爾", "巴爾的摩", "密爾瓦基", "多倫多", "蒙特婁", "溫哥華", "卡加利", "渥太華", "墨西哥城", "聖保羅", "里約熱內盧", "布宜諾斯艾利斯", "利馬", "波哥大", "聖地牙哥"];
+  const backgroundStories = ["夢想是開一間貓咪咖啡廳", "正在學習一種新的樂器", "私底下是個搖滾樂迷", "計畫在五年內環遊世界", "熱衷於參加馬拉松比賽", "對古文明歷史特別著迷", "是一位業餘的天文愛好者", "每週末都會去當志工", "正在寫一本關於自己家族史的小說", "曾經獨自一人去絲路旅行", "為了學習釀酒而搬到鄉下", "是個狂熱的桌遊收藏家", "經營一個分享烹飪技巧的部落格", "能用三種以上的語言流利對話", "小時候的夢想是成為太空人", "正在努力存錢買一艘帆船", "曾經在一場歌唱比賽中獲得亞軍", "對都市傳說有深入研究", "試圖還原一道失傳的宮廷菜", "每年都會參加大型的動漫展", "是一位經驗豐富的登山嚮導", "正在學習如何修復古董傢俱", "家裡有一面牆全是自己拍的照片", "深信外星人的存在", "正在訓練自己的寵物成為網紅", "對中古世紀的盔甲很有研究", "曾經在非洲的國家公園工作過", "是一位業餘的昆蟲學家", "能背誦莎士比亞的十四行詩", "正在籌備一場社區藝術節", "曾經搭便車橫跨整個歐洲", "熱愛研究各地區的方言", "是一位擁有專業證照的潛水教練", "正在學習傳統的木工技藝", "收集了所有版本的《魔戒》", "曾經在樂團中擔任貝斯手", "為了更接近大自然而住在山上", "是一位城市探險家，熱愛尋找廢棄建築", "正在學習如何駕駛輕航機", "曾經在南極科學考察站待過半年", "會用廢棄的電子零件創作藝術品", "是一位出色的業餘魔術師", "正在復育一種瀕臨絕種的蘭花", "對密碼學和謎題非常著迷", "曾經徒步完成聖雅各之路", "正在翻譯一本冷門的外國詩集", "是一位熱情的歷史重演參與者", "為了研究咖啡豆而走訪中南美洲", "精通各種繩結的打法", "正在打造一間屬於自己的樹屋", "曾經在豪華郵輪上擔任過娛樂總監", "是一位技巧高超的撲克牌玩家", "正在學習如何製作手工皮革", "對量子物理學有著濃厚的興趣", "曾經在馬戲團表演過雜耍", "是一位受人尊敬的社區領袖", "正在為一部獨立電影擔任配樂", "熱愛收集各種奇特的香料", "曾經騎單車環繞台灣一圈", "正在撰寫關於地方妖怪的田野調查", "是一位業餘的觀鳥愛好者", "對機器人學充滿熱情並自己組裝", "曾經在一個偏遠的小島上生活過一年", "正在學習古老的占星術", "是一位能言善道的辯論社王牌", "熱愛研究蕈類，時常到森林採集", "曾經贏得一場大胃王比賽", "正在復興一項傳統的民俗技藝", "是一位出色的沙畫藝術家", "對古代兵器有著深刻的了解", "曾經航行過太平洋", "正在學習如何用植物染布", "是一位業餘的電影評論家", "熱愛研究建築史", "曾經在育幼院擔任過長期志工", "正在學習如何製作手工肥皂", "是一位熱情的鐵道模型迷", "對海洋生物有著無比的熱愛", "曾經在沙漠中迷路三天三夜", "正在學習如何用3D列印機創造模型", "是一位業餘的民俗學家", "熱愛研究世界各地的神話故事", "曾經在一個古老的圖書館裡工作", "正在學習如何製作玻璃藝術品", "是一位熱衷於解謎遊戲的玩家", "對園藝有著極高的天賦", "曾經在國際志工組織服務", "正在學習如何編寫手機應用程式", "是一位業餘的化石收藏家", "熱愛研究中世紀的歐洲史", "曾經在一個偏遠的修道院裡靜修", "正在學習如何製作陶器", "是一位熱衷於密室逃脫的專家", "對植物的療效有深入研究", "曾經參與過一部紀錄片的拍攝", "正在學習如何釀造自己的啤酒", "是一位業餘的書法家"];
+  const secrets = ["害怕打雷", "曾經是田徑隊員", "對花生過敏", "看不懂地圖的路痴", "偷偷養了一隻寵物", "會說一種沒人聽過的語言", "蒐集了上百張黑膠唱片", "每天晚上都一定要跟植物說話", "其實是個音痴但很愛唱歌", "有一個從未告訴任何人的筆名", "相信世界上有魔法", "曾經把別人的情書誤送給老師", "偷偷在辦公室的盆栽裡種草莓", "能倒著背誦圓周率到小數點後50位", "有一個祕密的刺青在腳踝上", "小時候曾經把鄰居家的雞放走", "衣櫃裡有一件從大學穿到現在的T恤", "其實很怕看恐怖片但都裝作不怕", "偷偷用公司的印表機印自己的小說", "會把所有發票都對獎，連200元都沒中過", "曾經為了看日出而一夜沒睡，結果是陰天", "手機裡有一個資料夾專門存迷因圖", "偷偷練習過如何像電影明星一樣簽名", "覺得香菜是世界上最好吃的食物", "曾經在電梯裡放了一個很響的屁", "會把喜歡的歌的歌詞抄在筆記本上", "其實分不清楚醬油和醬油膏的差別", "偷偷追蹤一個寵物刺蝟的IG帳號", "曾經把鹽當成糖加進咖啡裡", "為了湊免運買了一堆不需要的東西", "會在家裡模仿電視上的舞蹈動作", "有一個只用來玩遊戲的小帳號", "偷偷把中獎的發票藏在書裡", "每次看感人的電影都一定會哭", "覺得自己的寵物比任何人都懂自己", "曾經在圖書館的書上畫過重點", "會把電影票根都好好地收藏起來", "其實很想學滑板但怕摔倒", "偷偷幫路邊的流浪貓都取了名字", "覺得卡通人物比真實人物更有魅力", "曾經把洗髮精當成沐浴乳用", "會在上司背後模仿他說話的樣子", "有一個專門用來抱怨的私人日記", "偷偷希望自己有超能力", "覺得鳳梨披薩是邪惡的發明", "曾經在面試時把自己的優點說成缺點", "會把用完的漂亮瓶子都留下來", "其實很喜歡聽老派的抒情歌", "偷偷練習過如何用單手打蛋", "覺得自己有成為大作家的潛力", "曾經在無人小島上露營過一夜", "會跟自己的倒影說話", "有一個從來沒用過的健身房會員資格", "偷偷希望自己能回到過去", "覺得穿襪子睡覺是人間一大享受", "曾經把寵物的名字當成密碼", "會把過期的優惠券留下來當書籤", "其實很怕搭飛機但假裝很鎮定", "偷偷在心裡為每個同事打分數", "覺得下雨天是世界末日的預兆", "曾經在演講比賽中忘詞整整一分鐘", "會把所有收到的賀卡都存起來", "其實很想養一隻羊駝", "偷偷希望自己能隱形", "覺得穿拖鞋上班是很時尚的事", "曾經把植物養死然後假裝它還活著", "會為了看流星雨而熬夜到天亮", "其實很怕黑但不敢承認", "偷偷在網路上用假名發表評論", "覺得吃火鍋不加沙茶醬是異端", "曾經在朋友的婚禮上哭得比新娘還慘", "會把所有夢到的奇怪情節都記錄下來", "其實很想學一種冷門的語言", "偷偷希望自己能和動物溝通", "覺得手寫信比任何電子郵件都溫暖", "曾經把別人的傘錯當成自己的拿走", "會為了吃限定版甜點而排隊兩小時", "其實很怕小丑", "偷偷在自己的書桌下藏零食", "覺得一天沒喝咖啡就無法思考", "曾經在重要的會議上睡著", "會把所有旅行的照片都洗出來", "其實很想當一個海盜", "偷偷希望自己能飛", "覺得穿不成套的襪子是一種時尚", "曾經把重要的文件當成廢紙丟掉", "會為了喜歡的樂團而去國外看演唱會", "其實很怕被搔癢", "偷偷在網路上看貓咪影片一看就是一小時", "覺得冬天就是要吃冰淇淋", "曾經在餐廳把服務生叫成老師", "會把所有有趣的石頭都撿回家", "其實很想住在森林裡的小木屋"];
+  const denominations = ["長老會", "浸信會", "信義會", "靈恩派", "福音派", "聖公會", "無宗派", "貴格會", "門諾會", "衛理公會", "改革宗", "五旬節派", "基督復臨安息日會", "東正教", "天主教", "科普特正教", "亞美尼亞使徒教會", "迦爾底天主教會", "馬龍尼禮教會", "敘利亞正教會", "聖多馬基督徒", "俄羅斯正教會", "希臘正教會", "羅馬尼亞正教會", "塞爾維亞正教會", "保加利亞正教會", "喬治亞正教會", "波蘭正教會", "阿爾巴尼亞正教會", "芬蘭正教會", "日本正教會", "中華正教會", "美國正教會", "烏克蘭正教會", "獨立福音派", "家庭教會", "基要派", "聖潔運動", "新教聖公宗", "歸正浸信會", "加爾文主義", "亞米念主義", "重洗派", "弟兄會", "虔敬主義", "摩拉維亞弟兄會", "公理會", "基督會", "神召會", "拿撒勒人會"];
+  const churchRoles = ["穩定聚會", "小組長", "敬拜團成員", "主日學老師", "招待", "全職傳道人", "牧師", "宣教士", "執事", "長老", "司琴", "音控同工", "直播同工", "禱告同工", "關懷探訪同工", "兒童事工老師", "青少年輔導", "社青團契主席", "松年團契成員", "教會行政同工", "財務同工", "場地管理同工", "清潔志工", "愛宴預備同工", "福音隊隊員", "短宣隊成員", "植堂核心成員", "神學生", "差會同工", "基督教機構同工", "文字事工編輯", "詩班成員", "插花志工", "網站管理員", "社群媒體小編", "活動攝影師", "翻譯同工", "新朋友關懷", "門徒訓練帶領者", "輔導協談員", "遊覽車司機", "停車場指揮", "醫療站義工", "法律顧問", "建築委員", "差傳委員", "教育委員", "慈善委員", "聖餐預備同工", "受洗班老師", "敬拜主領", "樂手", "司獻", "讀經員", "投影同工", "福音車駕駛", "活動總召", "器材管理", "總務", "文書", "圖書管理員", "資訊同工", "網頁設計", "美工設計", "膳食組長", "宿舍管理員", "宣教植堂委員會主席", "聖樂委員會主席", "主日學委員會主席", "青少年委員會主席", "社青委員會主席", "松年委員會主席", "財務委員會主席", "總務委員會主席", "關懷委員會主席", "聯誼活動組員", "體育活動組員", "戶外活動組員", "詩歌班班長", "聖歌隊指揮", "管風琴師", "手鐘隊員", "戲劇組員", "舞蹈組員", "插畫組員", "文字編輯", "校對志工", "錄音志工", "剪輯志工", "字幕志工", "咖啡師志工", "書店志工", "課後輔導老師", "社區關懷據點志工", "急難救助志工", "醫院志工", "監獄志工", "戒癮中心志工", "中途之家志工", "神學院學生", "神學院教授", "基督教出版社編輯"];
+  const bibleVerses = ["「我靠著那加給我力量的，凡事都能做。」(腓 4:13)", "「神愛世人，甚至將他的獨生子賜給他們，叫一切信他的，不致滅亡，反得永生。」(約 3:16)", "「應當一無掛慮，只要凡事藉著禱告、祈求，和感謝，將你們所要的告訴神。」(腓 4:6)", "「愛是恆久忍耐，又有恩慈。」(林前 13:4)", "「你要盡心、盡性、盡意，愛主你的神。」(太 22:37)", "「我留下平安給你們；我將我的平安賜給你們。」(約 14:27)", "「信就是所望之事的實底，是未見之事的確據。」(來 11:1)", "「你們要先求他的國和他的義，這些東西都要加給你們了。」(太 6:33)", "「因為人子來，並不是要受人的服事，乃是要服事人，並且要捨命作多人的贖價。」(可 10:45)", "「我們曉得萬事都互相效力，叫愛神的人得益處。」(羅 8:28)", "「所以，你們要去，使萬民作我的門徒。」(太 28:19)", "「我是葡萄樹，你們是枝子。」(約 15:5)", "「敬畏耶和華是智慧的開端；認識至聖者便是聰明。」(箴 9:10)", "「你們的光也當這樣照在人前，叫他們看見你們的好行為，便將榮耀歸給你們在天上的父。」(太 5:16)", "「不要效法這個世界，只要心意更新而變化。」(羅 12:2)", "「耶和華是我的牧者，我必不致缺乏。」(詩 23:1)", "「凡勞苦擔重擔的人可以到我這裡來，我就使你們得安息。」(太 11:28)", "「我已經與基督同釘十字架，現在活著的不再是我，乃是基督在我裡面活著。」(加 2:20)", "「你們願意人怎樣待你們，你們也要怎樣待人。」(路 6:31)", "「喜樂的心乃是良藥；憂傷的靈使骨枯乾。」(箴 17:22)", "「起初，神創造天地。」(創 1:1)", "「耶和華所賜的福使人富足，並不加上憂慮。」(箴 10:22)", "「你們要彼此相愛，像我愛你們一樣。」(約 15:12)", "「當孝敬父母，使你的日子在耶和華你神所賜你的地上得以長久。」(出 20:12)", "「人心籌算自己的道路；惟耶和華指引他的腳步。」(箴 16:9)", "「我豈沒有吩咐你嗎？你當剛強壯膽！不要懼怕，也不要驚惶。」(書 1:9)", "「主的靈在我身上，因為他用膏膏我，叫我傳福音給貧窮的人。」(路 4:18)", "「道成了肉身，住在我們中間，充充滿滿地有恩典有真理。」(約 1:14)", "「聖經都是神所默示的，於教訓、督責、使人歸正、教導人學義都是有益的。」(提後 3:16)", "「我們若認自己的罪，神是信實的，是公義的，必要赦免我們的罪，洗淨我們一切的不義。」(約壹 1:9)", "「我的恩典夠你用的，因為我的能力是在人的軟弱上顯得完全。」(林後 12:9)", "「你們得救是本乎恩，也因著信。」(弗 2:8)", "「凡事都可行，但不都有益處。凡事都可行，但不都造就人。」(林前 10:23)", "「你們要常在我裡面，我也常在你們裡面。」(約 15:4)", "「施比受更為有福。」(徒 20:35)", "「因為我們行事為人是憑著信心，不是憑著眼見。」(林後 5:7)", "「總要察驗何為主所喜悅的事。」(弗 5:10)", "「又要彼此相顧，激發愛心，勉勵行善。」(來 10:24)", "「在指望中要喜樂，在患難中要忍耐，禱告要恆切。」(羅 12:12)", "「所以，我們只管坦然無懼地來到施恩的寶座前，為要得憐恤，蒙恩惠，作隨時的幫助。」(來 4:16)", "「你們要謹慎行事，不要像愚昧人，當像智慧人。」(弗 5:15)", "「耶穌說：『我就是道路、真理、生命；若不藉著我，沒有人能到父那裡去。』」(約 14:6)", "「人若賺得全世界，賠上自己的生命，有什麼益處呢？」(太 16:26)", "「因為神的國不在乎吃喝，只在乎公義、和平，並聖靈中的喜樂。」(羅 14:17)", "「凡事謙虛、溫柔、忍耐，用愛心互相寬容。」(弗 4:2)", "「我們愛，因為神先愛我們。」(約壹 4:19)", "「你們要休息，要知道我是神！」(詩 46:10)", "「我的心哪，你為何憂悶？為何在我裡面煩躁？應當仰望神。」(詩 42:5)", "「我將這些事告訴你們，是要叫你們在我裡面有平安。」(約 16:33)", "「從來沒有人看見神，我們若彼此相愛，神就住在我們裡面，愛他的心在我們裡面得以完全了。」(約壹 4:12)"];
+      const spiritualGifts = ["教導", "服事", "憐憫人", "說預言", "治理事", "行神蹟", "說方言", "翻方言", "智慧的言語", "知識的言語", "信心", "醫病的恩賜", "辨別諸靈", "幫助人", "勸化", "施捨", "帶領", "使徒", "先知", "傳福音", "牧師", "教師", "獨身", "貧窮", "殉道", "款待", "代禱", "藝術創作", "音樂", "手工藝", "寫作", "領導", "行政管理", "諮商輔導", "鼓勵", "辨識", "慷慨", "信心英雄", "醫治", "款待", "知識", "領導力", "音樂恩賜", "詩歌創作", "組織能力", "策劃能力", "講道", "宣教", "受苦心志", "單純", "讚美", "敬拜帶領", "小組帶領", "兒童事工", "青少年事工", "長者關懷", "醫院探訪", "監獄探訪", "社區服務", "媒體製作", "網站設計", "財務管理", "建築設計", "園藝", "烹飪", "翻譯", "手語翻譯", "戲劇表演", "舞蹈", "插花", "攝影", "錄影", "音控", "燈光", "電腦技術", "活動策劃", "危機處理", "資源整合", "時間管理", "研究", "分析", "策略規劃", "夢境解析", "屬靈爭戰", "釋放禱告", "內在醫治", "門徒訓練", "建立關係", "和平使者", "辨別是非", "忍耐", "溫柔", "節制", "喜樂", "和平", "恩慈", "良善", "信實"];
+      const christianNicknames = ["蒙恩的小羊", "為主發光的星", "仰望十架的鴿子", "曠野中的以利亞", "神國的好管家", "溪水旁的樹", "為主奔跑的人", "小小的芥菜種", "神的孩子", "光和鹽", "蒙愛的兒女", "和平之子", "溫柔的鴿子", "信心的勇士", "光明的使者", "撒瑪利亞人", "忠心的僕人", "磐石上的房子", "天國的子民", "基督的精兵", "良善的撒種人", "尋找迷羊的牧人", "警醒的守望者", "神殿的活石", "結果子的樹", "被揀選的族類", "有君尊的祭司", "聖潔的國度", "屬神的子民", "世上的光", "山上的城", "燈臺上的燈", "地上的鹽", "麥子", "葡萄樹的枝子", "新造的人", "與神和好者", "天國的鑰匙", "跟隨羔羊的人", "得勝者", "穿白衣的人", "生命冊上有名的", "神殿中的柱子", "晨星", "坐在寶座上的", "智慧之子", "公義的冠冕", "永生的盼望", "真理的柱石", "百合花", "清心的人", "溫柔的人", "哀慟的人", "飢渴慕義的人", "憐恤人的人", "使人和睦的人", "為義受逼迫的人", "神百般恩賜的好管家", "無愧的工人", "基督的馨香之氣", "一台戲", "世上的客旅", "寄居的", "光明之子", "白晝之子", "神的同工", "基督的使者", "天上的國民", "神的產業", "貴重的器皿", "聖潔的器皿", "合乎主用", "預備行各樣的善事", "基督的身體", "神的殿", "聖靈的殿", "神的家", "真理的教會", "永生神的教會", "神的羊", "草場上的羊", "大牧人手下的羊", "客旅", "神的選民", "聖潔的祭司", "被贖的民", "栽種的樹", "修理的葡萄園", "受膏者", "守約施慈愛的神", "以便以謝", "耶和華以勒", "耶和華尼西", "耶和華沙龍", "耶和華拉法", "耶和華齊根努", "耶和華沙瑪", "耶和華羅伊"];
+      const transportationOptions = ["捷運", "公車", "Gogoro", "光陽 GP125", "Toyota Altis", "Honda CR-V", "自行車", "步行", "Mercedes-Benz C-Class", "BMW 5 Series", "Porsche Cayenne", "Tesla Model 3"];
+      const healthConditions = ["健康", "過敏", "慢性疲勞", "偏頭痛", "睡眠障礙", "高血壓", "糖尿病", "膝蓋退化", "胃食道逆流", "憂鬱症", "焦慮症", "癌症(康復中)", "心臟病", "氣喘", "關節炎", "視力不佳", "聽力受損", "皮膚炎", "消化不良", "貧血", "甲狀腺功能異常", "腎臟病", "肝功能異常", "痛風", "骨質疏鬆", "脊椎側彎", "五十肩", "坐骨神經痛", "椎間盤突出", "免疫系統失調", "紅斑性狼瘡", "類風濕性關節炎", "克隆氏症", "乳糜瀉", "多發性硬化症", "帕金森氏症", "阿茲海默症", "癲癇", "中風後遺症", "B型肝炎帶原", "C型肝炎帶原", "地中海型貧血", "蠶豆症", "色盲", "妥瑞氏症", "注意力不足過動症(ADHD)", "自閉症類群障礙(ASD)", "強迫症(OCD)", "恐慌症", "創傷後壓力症候群(PTSD)", "躁鬱症", "思覺失調症", "飲食失調", "藥物成癮", "酒精成癮", "菸癮", "網路成癮", "肥胖", "營養不良", "膽固醇過高", "三酸甘油酯過高", "脂肪肝", "膽結石", "腎結石", "膀胱炎", "攝護腺肥大", "子宮肌瘤", "經前症候群", "更年期症候群", "不孕症", "牙周病", "蛀牙", "白內障", "青光眼", "飛蚊症", "乾眼症", "中耳炎", "鼻竇炎", "香港腳", "灰指甲", "濕疹", "牛皮癬", "白斑", "圓禿", "痔瘡", "便祕", "腹瀉", "腸躁症", "食物過敏", "藥物過敏", "花粉症", "塵蟎過敏", "寵物毛過敏", "靜脈曲張", "手腳冰冷", "容易抽筋", "經常性感冒"];
+      
+      const spouseNames = [
+          { surname: "王", givenName: "建國" }, { surname: "陳", givenName: "淑芬" }, { surname: "林", givenName: "俊傑" }, { surname: "黃", givenName: "惠玲" }, { surname: "張", givenName: "偉誠" }, { surname: "李", givenName: "美玲" }, { surname: "劉", givenName: "文雄" }, { surname: "蔡", givenName: "雅婷" }, { surname: "楊", givenName: "宗翰" }, { surname: "許", givenName: "佳蓉" }, { surname: "鄭", givenName: "志明" }, { surname: "謝", givenName: "怡君" }, { surname: "郭", givenName: "冠宇" }, { surname: "洪", givenName: "詩涵" }, { surname: "曾", givenName: "文彬" }, { surname: "邱", givenName: "靜宜" }, { chinese: "廖", givenName: "家豪" }, { chinese: "賴", givenName: "欣怡" }, { chinese: "周", givenName: "建宏" }, { chinese: "徐", givenName: "婉婷" }, { chinese: "蘇", givenName: "信安" }, { chinese: "葉", givenName: "雅惠" }, { chinese: "莊", givenName: "國華" }, { chinese: "江", givenName: "淑惠" }, { chinese: "何", givenName: "明哲" }, { chinese: "蕭", givenName: "美月" }, { chinese: "羅", givenName: "志偉" }, { chinese: "高", givenName: "秀蘭" }, { chinese: "簡", givenName: "文傑" }, { chinese: "朱", givenName: "麗華" }, { chinese: "鍾", givenName: "俊彥" }, { chinese: "施", givenName: "雅玲" }, { chinese: "游", givenName: "承翰" }, { chinese: "詹", givenName: "靜芬" }, { chinese: "沈", givenName: "家銘" }, { chinese: "彭", givenName: "惠君" }, { chinese: "胡", givenName: "志遠" }, { chinese: "余", givenName: "佩珊" }, { chinese: "盧", givenName: "國棟" }, { chinese: "潘", givenName: "怡潔" }, { chinese: "顏", givenName: "俊賢" }, { chinese: "梁", givenName: "美君" }, { chinese: "趙", givenName: "文德" }, { chinese: "柯", givenName: "靜雯" }, { chinese: "翁", givenName: "家榮" }, { chinese: "魏", givenName: "淑貞" }, { chinese: "方", givenName: "志豪" }, { chinese: "孫", givenName: "雅雯" }, { chinese: "田", givenName: "國強" }, { chinese: "呂", givenName: "佳慧" }, { chinese: "程", givenName: "俊毅" }, { chinese: "宋", givenName: "美慧" }, { chinese: "范", givenName: "志成" }, { chinese: "馬", givenName: "靜儀" }, { chinese: "董", givenName: "家齊" }, { chinese: "曹", givenName: "惠敏" }, { chinese: "杜", givenName: "俊德" }, { chinese: "薛", givenName: "雅琪" }, { chinese: "丁", givenName: "國倫" }, { chinese: "石", givenName: "美雪" }, { chinese: "姜", givenName: "俊宇" }, { chinese: "邵", givenName: "靜怡" }, { chinese: "鄧", givenName: "志賢" }, { chinese: "侯", givenName: "雅芳" }, { chinese: "姚", givenName: "國賓" }, { chinese: "孟", givenName: "惠珍" }, { chinese: "傅", givenName: "俊瑋" }, { chinese: "段", givenName: "雅琳" }, { chinese: "雷", givenName: "國豪" }, { chinese: "錢", givenName: "美靜" }, { chinese: "龍", givenName: "俊傑" }, { chinese: "史", givenName: "惠文" }, { chinese: "陶", givenName: "志偉" }, { chinese: "黎", givenName: "雅君" }, { chinese: "賀", givenName: "國維" }, { chinese: "顧", givenName: "美玲" }, { chinese: "毛", givenName: "俊宏" }, { chinese: "郝", givenName: "靜宜" }, { chinese: "龔", givenName: "志明" }, { chinese: "嚴", givenName: "雅惠" }, { chinese: "白", givenName: "國榮" }, { chinese: "童", givenName: "美華" }, { chinese: "尹", givenName: "俊雄" }, { chinese: "孔", givenName: "靜芬" }, { chinese: "湯", givenName: "志強" }, { chinese: "康", givenName: "雅雯" }, { chinese: "溫", givenName: "國樑" }, { chinese: "紀", givenName: "美鳳" }, { chinese: "姚", givenName: "俊民" }, { chinese: "歐陽", givenName: "慧君" }, { chinese: "司馬", givenName: "文傑" }, { chinese: "諸葛", givenName: "靜香" }, { chinese: "上官", givenName: "志翔" }, { chinese: "公孫", givenName: "雅筑" }
+      ];
+      const childGivenNames = ["宇翔", "品萱", "冠廷", "詠晴", "柏翰", "詩涵", "宥嘉", "心妤", "承恩", "子晴", "睿恩", "苡晴", "宇辰", "品妍", "彥廷", "詠恩", "宥翔", "品希", "宇恩", "子涵", "承翰", "宥蓁", "冠霖", "品睿", "宇傑", "子芯", "彥宇", "品潔", "宥廷", "子晴", "柏宇", "苡瑄", "冠宇", "品蓁", "宇謙", "子瑜", "彥霖", "品璇", "宥霖", "子馨", "承叡", "宥甯", "冠廷", "品希", "宇翔", "子甯", "彥叡", "品媛", "宥睿", "子媛", "恩齊", "品潔", "宇恆", "詠心", "柏鈞", "詩晴", "宥誠", "心恬", "承祐", "子霏", "睿哲", "苡彤", "宇希", "品希", "彥齊", "詠晞", "宥傑", "品晞", "宇哲", "子晞", "承霖", "宥靚", "冠穎", "品靚", "宇靚", "子靚", "彥霖", "品靚", "宥霖", "子靚", "承翰", "宥靚", "冠宇", "品靚", "宇謙", "子靚", "彥宇", "品靚", "宥廷", "子靚", "柏宇", "苡瑄", "冠霖", "品蓁", "宇辰", "子瑜", "彥霖", "品潔", "宥霖", "子芯", "承叡", "宥甯", "冠廷", "品希", "宇翔", "子甯", "彥叡", "品媛", "宥睿", "子媛"];
+
+      const gender = sample(["男性", "女性"]);
+      const baseName = generateChineseNameWithPinyin();
+      
+      let finalEnglishName = baseName.pinyin;
+
+      const nameTypeChance = Math.random();
+      if (nameTypeChance < 0.3) { 
+        if (gender === '男性') {
+          finalEnglishName = `${sample(commonMaleNames)} ${baseName.surnamePinyin}`;
+        } else {
+          finalEnglishName = `${sample(commonFemaleNames)} ${baseName.surnamePinyin}`;
         }
+      } else if (nameTypeChance < 0.4) { 
+        if (gender === '男性') {
+          finalEnglishName = `${sample(uncommonMaleNames)} ${baseName.surnamePinyin}`;
+        } else {
+          finalEnglishName = `${sample(uncommonFemaleNames)} ${baseName.surnamePinyin}`;
+        }
+      }
+
+      const birthday = generateRandomBirthday();
+      const emailPrefix = generateGmailPrefix(finalEnglishName, birthday.substring(0, 4));
+      
+      const education = sample(educations);
+      let occupation = '';
+      const birthDate = new Date(birthday);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+      }
+
+      if (age < 23 && Math.random() < 0.8) { 
+          occupation = "大學生";
+      } else if (education === '博士') {
+          occupation = sample(occupations.academic);
+      } else if (education === '高中畢業' || education === '國中畢業') {
+          occupation = sample(occupations.nonDegree);
+      } else {
+          occupation = sample(occupations.all);
+      }
+
+
+      const maritalStatus = sample(["未婚", "已婚", "離婚", "交往中", "同居", "分居", "喪偶"]);
+      let spouse = null;
+      let spouseAge = null;
+      let children = [];
+
+      const hasPartnerStatuses = ['已婚', '同居', '分居'];
+      if (hasPartnerStatuses.includes(maritalStatus)) {
+        spouse = sample(spouseNames);
+        spouseAge = sample([age - 2, age, age + 3, age + 5]);
+      }
+
+      const canHaveChildrenStatuses = ['已婚', '離婚', '分居', '喪偶', '同居'];
+      if (canHaveChildrenStatuses.includes(maritalStatus) && age > 25) { 
+        if (Math.random() > 0.5) {
+          const numChildren = sample([1, 2, 3]);
+          for (let i = 0; i < numChildren; i++) {
+            let childSurname = baseName.surnameChinese;
+            if (spouse && Math.random() < 0.3) {
+                childSurname = spouse.surname;
+            }
+            children.push({
+              name: childSurname + sample(childGivenNames),
+              age: Math.floor(Math.random() * (age - 18)) + 1
+            });
+          }
+        }
+      }
+
+    return {
+      id: Date.now() + Math.random(),
+      chineseName: baseName.chinese,
+      englishName: finalEnglishName,
+      nickname: sample(christianNicknames),
+      gender,
+      birthday: `${birthday} (${age}歲)`,
+      emailPrefix,
+      maritalStatus,
+      spouseName: spouse ? spouse.surname + spouse.givenName : null,
+      spouseAge,
+      children,
+      education,
+      occupation,
+      story: sample(backgroundStories),
+      secret: sample(secrets),
+      denomination: sample(denominations),
+      churchRole: sample(churchRoles),
+      favoriteVerse: sample(bibleVerses),
+      spiritualGift: sample(spiritualGifts),
+      hobbies: sample(["閱讀", "瑜伽", "旅遊", "健身", "烹飪", "繪畫", "攝影", "彈吉他", "唱歌", "跳舞", "健行", "露營", "釣魚", "園藝", "烘焙", "書法", "陶藝", "編織", "寫程式", "寫部落格", "拍Vlog", "錄Podcast", "桌遊", "電玩", "看電影", "聽音樂", "彈鋼琴", "學習語言", "當志工", "觀星", "賞鳥", "騎單車", "游泳", "跑步", "攀岩", "滑板", "衝浪", "滑雪", "單板滑雪", "冥想", "寫作", "詩歌", "雕塑", "木工", "金工", "珠寶設計", "時裝設計", "室內設計", "建築欣賞", "研究歷史", "研究哲學", "研究心理學", "研究天文學", "研究物理", "研究化學", "研究生物", "研究數學", "研究經濟學", "研究政治", "研究社會學", "研究人類學", "研究考古學", "研究地質學", "研究地理", "研究語言學", "文學欣賞", "藝術史", "音樂史", "電影史", "戲劇", "歌劇", "芭蕾", "看脫口秀", "變魔術", "收集郵票", "收集錢幣", "收集古董", "模型製作", "機器人學", "玩無人機", "武術", "射箭", "擊劍", "騎馬", "帆船", "獨木舟", "輕艇", "水肺潛水", "浮潛", "品酒", "釀啤酒", "烘咖啡豆", "茶道", "參加烹飪比賽", "玩密室逃脫", "解謎", "下棋", "打麻將", "打撲克", "撞球", "射飛鏢", "打保齡球", "網球", "羽球", "籃球", "足球", "棒球", "排球", "高爾夫"]),
+      financialStatus: sample(["高收入", "中等收入", "財務自由", "穩定收入", "收入不穩定", "月光族", "負債中", "領固定薪水", "靠接案維生", "靠版稅/權利金維生", "靠投資理財維生", "退休金生活", "學生無收入", "待業中", "領失業救濟金", "家境優渥", "小康家庭", "經濟拮据", "努力存錢中", "有房貸壓力", "有車貸壓力", "為子女教育基金煩惱", "財務狀況良好", "擁有多處房產", "股票投資高手", "加密貨幣玩家", "創業初期燒錢中", "尋求天使投資", "準備財務獨立", "追求極簡生活", "收入來源多元", "靠被動收入生活", "打零工維生", "家庭主婦/主夫", "仰賴伴侶收入", "儲蓄充足", "幾乎無儲蓄", "有緊急預備金", "正在進行財務規劃", "債務整合中", "信用良好", "曾有信用瑕疵", "投資失利過", "樂透得主", "繼承家產", "信託基金受益人", "靠獎學金度日", "社會福利補貼", "財務狀況保密"]),
+      location: sample(locations),
+      transportation: sample(transportationOptions),
+      socialMedia: sample(["IG", "Facebook", "LinkedIn", "X (Twitter)", "TikTok", "YouTube", "Pinterest", "Reddit", "Discord", "Telegram", "WhatsApp", "LINE", "WeChat", "Snapchat", "Threads", "Mastodon", "BeReal", "小紅書", "Dcard", "PTT"]),
+      politicalView: sample(["中立", "自由派", "保守派", "社會主義", "自由意志主義", "無政府主義", "社群主義", "女性主義", "環境主義", "和平主義", "民族主義", "全球主義", "民粹主義", "威權主義", "務實主義", "理想主義", "政治冷感", "激進派", "溫和派", "搖擺不定"]),
+      healthCondition: sample(healthConditions),
+      consumptionConcept: sample(["理性消費", "重視品質", "極簡主義", "衝動購物", "品牌忠誠者", "價格敏感型", "追求CP值", "體驗至上", "享樂主義", "儲蓄優先", "環保主義消費", "支持在地小農", "崇尚名牌", "喜愛二手貨", "網購達人", "實體店愛好者", "團購愛好者", "訂閱制愛好者", "分期付款愛好者", "現金主義者", "信用卡愛用者", "行動支付愛用者", "討厭浪費", "喜歡囤貨", "只買必需品", "樂於嘗試新品", "偏好手工制品", "重視設計感", "功能導向", "安全第一", "健康取向", "有機食品愛好者", "公平貿易支持者", "懷舊消費", "科技追新族", "佛系購物", "精打細算", "為興趣一擲千金", "投資型消費", "社交型消費", "儀式感消費", "療癒型消費", "知識付費者", "收藏家", "實用主義", "美學主義", "避免消費", "贈品愛好者", "點數集點達人"]),
+      lifeView: sample(["活出自己", "盡力而為", "及時行樂", "順其自然", "平淡是福", "追求卓越", "服務他人", "改變世界", "探索未知", "享受孤獨", "家庭至上", "友誼第一", "愛情至上", "工作狂", "生活與工作平衡", "精神滿足優先", "物質享受優先", "活在當下", "規劃未來", "回顧過去", "相信因果", "人定勝天", "宿命論", "自由意志", "經驗主義", "理性主義", "存在主義", "虛無主義", "樂觀主義", "悲觀主義", "現實主義", "理想主義", "利己主義", "利他主義", "享樂主義", "禁慾主義", "個人主義", "集體主義", "簡單生活", "斷捨離", "精緻生活", "儀式感", "冒險精神", "安穩度日", "不斷學習", "挑戰自我", "保持初心", "感恩惜福", "隨遇而安", "勇於追夢", "腳踏實地", "及時行善", "寬恕他人", "嚴以律己", "寬以待人", "遊戲人間", "尋求真理", "創造價值", "留下印記", "傳承文化", "保護環境", "促進和平", "爭取公義", "保持健康", "鍛鍊心智", "心靈平靜", "幽默感是必須的", "藝術即生活", "科技改變未來", "傳統有其智慧", "擁抱變化", "忠於自我", "誠實為上", "信用是金", "知識就是力量", "行動勝於空談", "失敗為成功之母", "團結就是力量", "獨立思考", "批判性思維", "保持好奇心", "終身學習", "愛與被愛", "感受大自然", "體驗不同文化", "建立深刻關係", "追求內心平靜", "實現自我價值", "貢獻社會", "享受過程", "結果不重要", "效率至上", "慢活", "保持彈性", "堅守原則", "勇於表達", "善於傾聽", "活得有意義", "活得快樂"]),
+      motto: sample(["凡事感恩", "誠實為本", "保持好奇", "永不放棄", "活在當下", "行動勝於空談", "知識就是力量", "保持謙卑", "勇於不同", "簡單就是美", "每天進步一點點", "相信自己", "助人為快樂之本", "分享是福", "學習無止境", "態度決定高度", "細節決定成敗", "機會是留給準備好的人", "時間就是金錢", "健康是最大的財富", "家庭是我的避風港", "友誼天長地久", "愛能克服一切", "和平始於微笑", "寬恕是給自己的禮物", "幽默感是最好的解藥", "讀萬卷書行萬里路", "己所不欲勿施於人", "天助自助者", "有志者事竟成", "少說多做", "三思而後行", "一期一會", "日日是好日", "心靜自然涼", "知足常樂", "吃虧就是佔便宜", "忍一時風平浪靜", "退一步海闊天空", "滴水穿石", "熟能生巧", "工欲善其事必先利其器", "前事不忘後事之師", "亡羊補牢為時未晚", "百聞不如一見", "學然後知不足", "青出於藍而勝於藍", "己欲立而立人己欲達而達人", "路遙知馬力日久見人心", "書到用時方恨少", "一寸光陰一寸金", "種瓜得瓜種豆得豆", "近朱者赤近墨者黑", "水能載舟亦能覆舟", "條條大路通羅馬", "羅馬不是一天造成的", "知識改變命運", "態度決定一切", "習慣成就未來", "堅持就是勝利", "專注當下", "擁抱不確定性", "成為更好的自己", "善良是一種選擇", "聆聽內心的聲音", "活出熱情", "創造自己的幸運", "讓世界因我而不同", "保持正向思考", "永遠保持童心", "活到老學到老", "失敗乃兵家常事", "吃得苦中苦方為人上人", "天無絕人之路", "一勤天下無難事", "知己知彼百戰不殆", "小不忍則亂大謀", "千里之行始於足下", "滿招損謙受益", "良藥苦口利於病", "忠言逆耳利於行", "人非聖賢孰能無過", "過而能改善莫大焉", "海納百川有容乃大", "壁立千仞無欲則剛", "己所不欲勿施於人", "靜坐常思己過閒談莫論人非", "但行好事莫問前程", "善有善報惡有惡報", "不是不報時候未到", "寧鳴而死不默而生", "風聲雨聲讀書聲聲聲入耳", "家事國事天下事事事關心", "為天地立心為生民立命", "為往聖繼絕學為萬世開太平"]),
+      familyBackground: sample(["雙親健在", "單親家庭", "小康家庭", "隔代教養", "父母離異", "繼親家庭", "獨生子女", "手足眾多", "核心家庭", "大家庭", "領養家庭", "跨國婚姻家庭", "軍公教家庭", "商業世家", "藝術世家", "書香世家", "務農家庭", "工人家庭", "新住民家庭", "關係疏離的家庭"]),
+      wish: sample(["世界和平", "家庭幸福", "財富自由", "身體健康", "事業有成", "環遊世界", "早日退休", "找到真愛", "買一棟房子", "學會一項新技能", "出一本書", "開一間店", "中樂透", "減肥成功", "養一隻寵物", "讓父母驕傲", "幫助更多人", "成為更好的人", "每天都很快樂", "睡到自然醒", "吃遍天下美食", "看遍所有好電影", "學會彈吉他", "學會畫畫", "學會跳舞", "學會一種外語", "認識新朋友", "找到人生方向", "實現自我價值", "內心平靜", "擺脫焦慮", "更有自信", "更有勇氣", "更有智慧", "更有耐心", "更有同理心", "更有創造力", "更有執行力", "更有影響力", "讓世界更美好", "保護地球環境", "消除貧窮", "促進教育平等", "實現性別平等", "為弱勢發聲", "守護動物權益", "傳承文化遺產", "推動科技進步", "探索宇宙奧秘", "找到外星人", "時光旅行", "擁有超能力", "長生不老", "青春永駐", "每天都有好事發生", "所有考試都過關", "工作順利", "升官發財", "投資順利", "股票大漲", "遠離小人", "遇到貴人", "桃花朵朵開", "婚姻美滿", "子女乖巧", "父母健康長壽", "兄弟姊妹和睦", "朋友常相聚", "寵物健康活潑", "減輕壓力", "改善睡眠", "增強記憶力", "保持好身材", "皮膚變好", "頭髮茂密", "牙齒健康", "視力清晰", "聽力正常", "骨骼強健", "精神飽滿", "心情愉快", "充滿活力", "靈感源源不絕", "創作不斷", "表演成功", "比賽得獎", "獲得肯定", "得到尊重", "被人理解", "被人需要", "被人愛著", "找到歸屬感", "活得精彩", "死而無憾"]),
+      lifeGoal: sample(["成為領袖", "幫助他人", "環遊世界", "財務自由", "建立幸福家庭", "成為領域專家", "創造傳世作品", "改變世界", "追求真理", "實現自我價值", "活得快樂", "保持健康", "終身學習", "奉獻社會", "傳承智慧", "保護自然", "促進和平", "爭取公義", "探索宇宙", "享受生活", "建立深厚友誼", "找到靈魂伴侶", "教育下一代", "創業成功", "成為藝術家", "成為科學家", "成為運動員", "成為作家", "成為音樂家", "成為發明家", "成為慈善家", "成為精神導師", "達到心靈平靜", "克服所有恐懼", "活出無悔的人生", "留下正面影響", "啟發他人", "建立一個社群", "推動一項改革", "解決一個社會問題", "發明一個新科技", "發現一個新物種", "寫一部史詩", "作一首名曲", "畫一幅名畫", "拍一部經典電影", "蓋一棟代表性建築", "設計一個改變生活的產品", "建立一個永續的企業", "培養一個世界冠軍", "拯救一個瀕危物種", "復育一片森林", "清潔一片海洋", "建立一所學校", "建立一間醫院", "建立一個庇護所", "為無家者提供住所", "為飢餓者提供食物", "為受壓迫者發聲", "為被遺忘者帶來希望", "傳播愛與善良", "分享知識與經驗", "鼓勵人們追逐夢想", "成為一個好榜樣", "孝順父母", "忠於伴侶", "關愛子女", "珍惜朋友", "善待動物", "尊重生命", "保持誠信", "堅守正義", "勇於承擔", "樂於分享", "懂得感恩", "學會放下", "活在當下", "擁抱未來", "接納過去", "認識自己", "超越自己", "找到生命的意義", "與神同行", "活出使命", "榮耀神", "見證信仰", "傳揚福音", "建立神的國度", "等待主的再來"]),
+      strengths: sample(["有同理心", "領導力", "創造力", "適應力強", "學習力強", "解決問題能力", "溝通能力", "團隊合作", "責任感", "抗壓性高", "樂觀積極", "細心謹慎", "有耐心", "有毅力", "誠實可靠", "善於分析", "邏輯清晰", "勇於創新", "執行力強", "時間管理能力", "組織能力", "規劃能力", "決策能力", "談判能力", "說服力", "演講能力", "寫作能力", "藝術天分", "音樂天分", "運動天分", "幽默感", "親和力", "善於傾聽", "樂於助人", "慷慨大方", "懂得感恩", "懂得自省", "情緒穩定", "精力充沛", "身體強健", "記憶力好", "觀察力敏銳", "直覺準確", "富有想像力", "審美觀好", "動手能力強", "善於理財", "有數字概念", "善於交際", "人脈廣闊", "有遠見", "有格局", "有膽識", "敢於冒險", "堅守原則", "忠誠度高", "保守秘密", "值得信賴", "應變能力快", "善於抓重點", "目標導向", "結果導向", "過程導向", "注重細節", "追求完美", "效率高", "工作勤奮", "有上進心", "不斷自我提升", "接受批評", "勇於承認錯誤", "善於總結經驗", "能夠舉一反三", "知識淵博", "見多識廣", "文化素養高", "跨文化溝通能力", "多語言能力", "程式設計能力", "數據分析能力", "設計能力", "攝影能力", "影片剪輯能力", "烹飪技巧", "園藝技巧", "急救知識", "生存技能", "駕駛技術", "教導能力", "輔導能力", "激勵他人能力", "化解衝突能力", "建立共識能力", "危機處理能力", "資源整合能力", "創新思維", "批判性思維", "系統性思維", "策略性思維", "抽象思維能力"]),
+      weaknesses: sample(["固執", "健忘", "拖延", "完美主義", "缺乏自信", "容易焦慮", "容易緊張", "容易分心", "注意力不集中", "三分鐘熱度", "缺乏耐心", "缺乏毅力", "猶豫不決", "優柔寡斷", "害怕失敗", "害怕被拒絕", "害怕衝突", "害怕孤獨", "害怕改變", "害怕承擔責任", "容易相信別人", "耳根子軟", "心太軟", "不善拒絕", "討好型人格", "悲觀消極", "愛鑽牛角尖", "想太多", "情緒化", "容易生氣", "容易嫉妒", "容易驕傲", "容易自卑", "容易受他人影響", "缺乏主見", "依賴性強", "控制慾強", "佔有慾強", "疑心病重", "愛比較", "愛抱怨", "愛批評", "愛八卦", "愛面子", "虛榮心強", "懶散", "邋遢", "不愛乾淨", "沒有時間觀念", "經常遲到", "花錢沒有節制", "衝動購物", "不善理財", "數字概念差", "路痴", "方向感差", "肢體不協調", "運動細胞差", "五音不全", "沒有節奏感", "缺乏藝術細胞", "缺乏想像力", "缺乏創造力", "缺乏邏輯思維", "缺乏常識", "知識面窄", "不愛學習", "不愛讀書", "不愛思考", "溝通能力差", "不善言辭", "社交恐懼", "害怕公開演講", "寫作能力差", "字醜", "挑食", "偏食", "飲食不規律", "作息不規律", "經常熬夜", "沉迷網路", "沉迷遊戲", "沉迷追劇", "有菸癮", "有酒癮", "有賭癮", "說話太直", "不懂得看場合說話", "容易得罪人", "缺乏幽默感", "太過嚴肅", "缺乏彈性", "不懂得變通", "執行力差", "眼高手低", "紙上談兵", "膽小怕事", "缺乏膽識"]),
+      lifestyle: sample(["早睡早起", "夜貓子", "彈性工時", "規律作息", "作息不規律", "養生達人", "速食愛好者", "素食主義者", "蛋奶素", "純素", "健身狂人", "瑜伽愛好者", "戶外運動愛好者", "室內派", "宅男/宅女", "社交達人", "派對動物", "獨行俠", "小團體核心", "邊緣人", "話題主導者", "傾聽者", "意見領袖", "跟隨者", "和事佬", "挑戰者", "觀察者", "分析者", "感受者", "思考者", "判斷者", "感知者", "控制者", "配合者", "領導者", "支持者", "組織者", "協調者", "創新者", "實踐者", "完美主義者", "實用主義者", "樂觀主義者", "悲觀主義者", "現實主義者", "理想主義者", "利他主義者", "利己主義者", "幽默風趣", "嚴肅認真", "溫和友善", "直接坦率", "委婉含蓄", "情感豐富", "理性冷靜", "精力充沛", "沉穩內斂", "喜歡熱鬧", "享受安靜", "廣結善緣", "君子之交淡如水"]),
+      learningStyle: sample(["視覺學習", "實作學習", "聽覺學習", "閱讀/寫作學習", "動態學習(透過身體活動)", "邏輯/數學學習", "人際學習(透過與他人互動)", "內省學習(獨立思考)", "自然觀察學習", "音樂/旋律學習", "語言學習", "空間學習", "模仿學習", "經驗學習", "探索式學習", "專案式學習", "問題導向學習", "遊戲化學習", "合作學習", "競爭學習", "獨立學習", "指導式學習", "自主學習", "混合式學習", "線上學習", "實體課程學習", "小組討論學習", "一對一學習", "透過教學來學習", "透過犯錯來學習", "系統性學習", "碎片化學習", "概念性學習", "細節導向學習", "結構化學習", "非結構化學習", "跨領域學習", "深度學習", "廣度學習", "快速學習", "慢速學習", "壓力下學習效果好", "放鬆時學習效果好", "早上學習效果好", "晚上學習效果好", "需要安靜環境學習", "需要背景音學習", "透過影片學習", "透過音頻學習", "透過書籍學習", "透過實作學習", "透過與人交談學習", "透過觀察學習", "透過提問學習", "透過辯論學習", "透過寫筆記學習", "透過畫心智圖學習", "透過複誦學習", "透過聯想學習", "透過故事學習", "透過比喻學習", "透過實際應用學習", "透過反思學習", "透過冥想學習", "透過模擬學習", "透過角色扮演學習", "透過實驗學習", "透過旅行學習", "透過參觀學習", "透過訪談學習", "透過網路搜尋學習", "透過社群學習", "透過導師指導學習", "透過同儕互助學習", "透過自我挑戰學習", "透過設定目標學習", "透過獎勵機制學習", "透過即時回饋學習", "透過長期專注學習", "透過短時間衝刺學習", "透過多感官學習", "透過單一感官學習", "透過視覺化學習", "透過抽象思考學習", "透過具體案例學習", "透過理論框架學習", "透過歷史脈絡學習", "透過比較分析學習", "透過歸納法學習", "透過演繹法學習", "透過批判性思考學習", "透過創造性思考學習", "透過直覺學習", "透過情感連結學習", "透過身體記憶學習", "透過解決真實問題學習", "透過參加工作坊學習", "透過線上課程學習", "透過閱讀研究報告學習", "透過觀看紀錄片學習"]),
+      thinkingMode: sample(["邏輯思維", "感性思維", "批判性思維", "創造性思維", "系統思維", "策略思維", "直覺思維", "抽象思維", "具象思維", "歸納思維", "演繹思維", "聯想思維", "發散思維", "收斂思維", "逆向思維", "橫向思維", "垂直思維", "圖像思維", "文字思維", "數字思維", "空間思維", "時間思維", "辯證思維", "類比思維", "隱喻思維", "哲學思維", "科學思維", "藝術思維", "設計思維", "工程思維", "商業思維", "法律思維", "醫學思維", "教育思維", "歷史思維", "未來思維", "宏觀思維", "微觀思維", "整體思維", "局部思維", "樂觀思維", "悲觀思維", "現實思維", "理想思維", "積極思維", "消極思維", "正向思維", "負向思維", "問題導向思維", "解決方案導向思維", "過程導向思維", "結果導向思維", "以人為本的思維", "以數據為本的思維", "以經驗為本的思維", "以理論為本的思維", "快速思考", "深度思考", "反思性思維", "前瞻性思維", "回溯性思維", "多角度思維", "單一角度思維", "彈性思維", "固執思維", "開放性思維", "封閉性思維", "探索性思維", "驗證性思維", "假設性思維", "實證性思維", "概念化能力強", "細節分析能力強", "整合能力強", "分解能力強", "模式識別能力強", "優先順序判斷能力強", "風險評估能力強", "機會識別能力強", "根本原因分析能力強", "影響力分析能力強", "成本效益分析能力強", "可行性分析能力強", "需求分析能力強", "競爭分析能力強", "優劣勢分析(SWOT)能力強", "心智圖思考", "流程圖思考", "故事化思考", "視覺化思考", "聽覺化思考", "動態化思考", "模組化思考", "平台化思考", "生態系思考", "第一性原理思考", "MECE原則思考"]),
+      socialStyle: sample(["外向", "內向", "慢熟", "自來熟", "社交蝴蝶", "獨行俠", "小團體核心", "邊緣人", "話題主導者", "傾聽者", "意見領袖", "跟隨者", "和事佬", "挑戰者", "觀察者", "分析者", "感受者", "思考者", "判斷者", "感知者", "控制者", "配合者", "領導者", "支持者", "組織者", "協調者", "創新者", "實踐者", "完美主義者", "實用主義者", "樂觀主義者", "悲觀主義者", "現實主義者", "理想主義者", "利他主義者", "利己主義者", "幽默風趣", "嚴肅認真", "溫和友善", "直接坦率", "委婉含蓄", "情感豐富", "理性冷靜", "精力充沛", "沉穩內斂", "喜歡熱鬧", "享受安靜", "廣結善緣", "君子之交淡如水"]),
+      futurePlan: sample(["創業", "深造", "退休", "移民", "環遊世界", "買房", "結婚", "生子", "換工作", "轉行", "學習新技能", "考取證照", "攻讀學位", "寫一本書", "開一間店", "成立非營利組織", "投身政治", "成為全職志工", "搬到鄉下", "搬到海邊", "搬到山上", "學習一門手藝", "成為藝術家", "成為音樂家", "成為作家", "成為演員", "成為導演", "成為運動員", "成為教練", "成為老師", "成為教授", "成為科學家", "成為發明家", "成為企業家", "成為投資家", "成為慈善家", "成為精神導師", "達到財務自由", "提早退休", "陪伴家人", "照顧父母", "教育子女", "享受兩人世界", "追求心靈成長", "學習冥想", "學習瑜伽", "學習正念", "探索內心世界", "尋找生命的意義", "完成一項極限挑戰", "攀登聖母峰", "橫渡大西洋", "完成鐵人三項", "參加奧運", "學習開飛機", "學習開船", "學習潛水", "學習滑雪", "學習馬術", "學習射箭", "學習一種樂器", "學習一種舞蹈", "學習一種語言", "學習一種程式語言", "學習烹飪", "學習園藝", "學習木工", "學習陶藝", "學習攝影", "學習繪畫", "學習寫作", "學習演講", "學習談判", "學習領導", "學習管理", "建立個人品牌", "經營自媒體", "成為網紅", "成為播客主", "成為YouTuber", "發表學術論文", "取得專利", "設計一款App", "開發一套軟體", "創立一個品牌", "舉辦一場展覽", "發行一張專輯", "演出一部電影", "寫一部劇本", "跑一場馬拉松", "參加一場鐵人三項", "航海環球", "徒步環島", "深入偏鄉服務", "參與國際救援", "推動環保議題", "倡導動物權益", "促進社會公義", "傳承傳統文化", "守護歷史古蹟", "探索秘境"]),
+      socialConcern: sample(["環保", "教育", "動物權益", "貧富差距", "性別平等", "種族歧視", "人權議題", "勞工權益", "兒童福利", "青少年問題", "老年照護", "身心障礙者權益", "醫療資源分配", "健保制度", "食品安全", "居住正義", "土地正義", "司法改革", "政治改革", "媒體素養", "假新聞問題", "網路霸凌", "資訊安全", "隱私權保護", "能源轉型", "再生能源", "核能議題", "氣候變遷", "海洋汙染", "塑膠汙染", "空氣汙染", "水資源汙染", "噪音汙染", "光害", "廢棄物處理", "循環經濟", "永續發展", "生物多樣性", "瀕危物種保育", "森林保育", "濕地保育", "在地農業", "食農教育", "文化資產保存", "傳統技藝傳承", "母語復興", "新住民權益", "移工權益", "原住民權益", "同性婚姻平權", "性少數權益", "轉型正義", "和平議題", "反戰", "國際人道救援", "難民議題", "全球暖化", "極端氣候", "糧食危機", "水資源危機", "傳染病防治", "公共衛生", "心理健康", "憂鬱症防治", "自殺防治", "毒品氾濫", "賭博問題", "酒駕問題", "交通安全", "都市更新", "社區營造", "地方創生", "公民參與", "審議式民主", "志工服務", "企業社會責任", "社會企業", "公平貿易", "數位落差", "科技倫理", "人工智慧倫理", "基因編輯倫理", "安樂死議題", "死刑存廢", "監獄改革", "更生人輔導", "家庭暴力防治", "性侵害防治", "校園霸凌", "教育改革", "課綱議題", "技職教育", "高等教育", "終身學習", "藝術文化發展", "體育發展", "觀光發展"]),
+      leisureDepth: sample(["表層放鬆", "深層沉浸", "專業愛好", "社交型", "獨處型", "學習型", "創作型", "運動型", "冒險型", "療癒型", "娛樂型", "藝文型", "科技型", "戶外型", "室內型", "靜態型", "動態型", "短時間", "長時間", "規律性", "偶發性", "季節性", "節慶性", "日常性", "週末限定", "假日限定", "夜間限定", "白天限定", "晨間限定", "獨自享受", "與伴侶共享", "與家人同樂", "與朋友同樂", "與寵物互動", "參加社團", "參加工作坊", "參加課程", "參加講座", "參加讀書會", "參加電影會", "參加音樂會", "參加演唱會", "參加展覽", "參加市集", "參加派對", "參加聚餐", "參加運動賽事", "參加電競比賽", "參加桌遊團", "參加密室逃脫", "參加戶外露營", "參加登山健行", "參加單車旅行", "參加水上活動", "參加雪地活動", "參加志工服務", "逛街購物", "看電視", "看電影", "追劇", "看動漫", "看綜藝節目", "聽音樂", "聽Podcast", "聽廣播", "玩手機遊戲", "玩電腦遊戲", "玩主機遊戲", "上網", "逛社群媒體", "看YouTube影片", "閱讀", "寫作", "畫畫", "攝影", "彈奏樂器", "唱歌", "跳舞", "烹飪", "烘焙", "園藝", "手工藝", "整理家務", "泡澡", "按摩", "冥想", "瑜伽", "健身", "跑步", "游泳", "球類運動", "散步", "遛狗", "陪貓玩", "發呆", "睡覺", "小酌", "品茶", "喝咖啡", "吃美食", "旅行", "探索新地方"]),
+      emotionManagement: sample(["運動", "禱告", "寫日記", "找人傾訴", "聽音樂", "看電影", "閱讀", "獨處", "靜坐", "冥想", "正念練習", "深呼吸", "散步", "接近大自然", "爬山", "看海", "泡澡", "睡覺", "吃美食", "烹飪", "烘焙", "畫畫", "寫書法", "彈奏樂器", "唱歌", "跳舞", "玩遊戲", "看喜劇", "看可愛動物影片", "整理房間", "打掃", "做手工藝", "園藝", "養寵物", "哭一場", "大叫", "打枕頭", "購物", "旅行", "參加派對", "和朋友聚會", "尋求專業協助", "心理諮商", "參加支持團體", "學習情緒管理課程", "做瑜伽", "做伸展運動", "重量訓練", "有氧運動", "游泳", "騎自行車", "打球", "泡溫泉", "按摩", "芳香療法", "品茶", "喝咖啡", "寫感恩日記", "列出待辦事項", "規劃未來", "回顧過去的成功經驗", "幫助他人", "做志工", "學習新知", "解決問題", "專注於工作", "專注於興趣", "玩樂器", "唱歌", "創作", "看書", "玩拼圖", "玩桌遊", "玩電玩", "看運動比賽", "追劇", "看動漫", "逛街", "逛展覽", "逛博物館", "逛書店", "逛市集", "參加音樂會", "參加演唱會", "參加戲劇表演", "看脫口秀", "泡咖啡廳", "到酒吧小酌", "開車兜風", "騎車兜風", "攝影", "觀星", "賞鳥", "釣魚", "露營", "健行", "攀岩", "衝浪", "潛水", "滑雪", "寫程式", "研究有興趣的主題", "和家人聊天", "和伴侶談心", "擁抱", "撫摸寵物", "曬太陽", "淋雨", "聽白噪音", "聽ASMR", "玩樂高", "玩模型", "寫詩", "寫小說", "經營部落格", "錄Podcast", "剪輯影片"]),
+      humorType: sample(["冷面笑匠", "自嘲型", "諧音梗大師", "吐槽型", "模仿型", "黑色幽默", "荒謬型", "雙關語型", "諷刺型", "誇張型", "肢體搞笑型", "裝傻型", "機智反應型", "溫馨幽默型", "尷尬幽默型", "厭世幽默型", "知識型幽默", "觀察型幽默", "故事型幽默", "反差萌型", "廢文型", "迷因型", "網路梗玩家", "地獄梗愛好者", "雙關語愛好者", "冷笑話大王", "黃色笑話型", "政治不正確型", "嘲諷權威型", "小眾梗愛好者", "角色扮演型", "聲音模仿型", "表情豐富型", "節奏感型", "突發奇想型", "無厘頭型", "慢半拍型", "一本正經講幹話型", " situational comedy (情境喜劇) 型", "slapstick (打鬧) 型", "deadpan (面無表情) 型", "witty (機智) 型", "dry (冷面) 型", "sarcastic (諷刺) 型", "ironic (反諷) 型", "goofy (傻氣) 型", "charming (魅力) 型", "nerdy (書呆子) 型", "geeky (極客) 型", "dark (黑暗) 型", "blue (藍色笑話) 型", "clean (乾淨) 型", "family-friendly (家庭友善) 型", "observational (觀察) 型", "anecdotal (軼事) 型", "surreal (超現實) 型", "absurd (荒謬) 型", "satirical (諷刺文學) 型", "parody (戲仿) 型", "self-deprecating (自嘲) 型", "wordplay (文字遊戲) 型", "pun (雙關語) 型", "one-liner (一句話笑話) 型", "storytelling (說故事) 型", "physical (肢體) 型", "character (角色) 型", "improvisational (即興) 型", "topical (時事) 型", "political (政治) 型", "cultural (文化) 型", "historical (歷史) 型", "scientific (科學) 型", "philosophical (哲學) 型", "musical (音樂) 型", "visual (視覺) 型", "prop (道具) 型", "insult (侮辱) 型", "roast (吐槽大會) 型", "friendly (友善) 型", "gentle (溫和) 型", "sharp (尖銳) 型", "quick (快速) 型", "subtle (微妙) 型", "obvious (明顯) 型", "high-brow (陽春白雪) 型", "low-brow (下里巴人) 型", "intellectual (知識分子) 型", "silly (愚蠢) 型", "childish (幼稚) 型", "mature (成熟) 型", "sophisticated (老練) 型", "crude (粗俗) 型", "offensive (冒犯) 型", "edgy (前衛) 型"]),
+      symbolicItem: sample(["手鍊", "咖啡杯", "鋼筆", "筆記本", "手錶", "眼鏡", "帽子", "圍巾", "戒指", "項鍊", "耳環", "胸針", "領帶", "領結", "袖扣", "皮夾", "鑰匙圈", "手機殼", "筆電貼紙", "帆布袋", "後背包", "公事包", "相機", "耳機", "隨身碟", "書籤", "鋼筆墨水", "打火機", "煙斗", "雪茄剪", "酒壺", "開瓶器", "杯墊", "馬克杯", "保溫瓶", "水壺", "便當盒", "環保餐具", "手帕", " handkerchief", "懷錶", "指南針", "望遠鏡", "放大鏡", "地圖", "地球儀", "沙漏", "日晷", "羽毛筆", "墨水瓶", "封蠟章", "印章", "算盤", "摺扇", "鼻煙壺", "懷舊玩具", "彈珠", "陀螺", "毽子", "魔術方塊", "樂高人偶", "模型車", "模型飛機", "船艦模型", "機器人模型", "公仔", "扭蛋", "盲盒", "塔羅牌", "水晶球", "符文石", "幸運符", "御守", "平安符", "佛珠", "念珠", "十字架", "聖經", "可蘭經", "佛經", "道德經", "塔木德", "勳章", "獎牌", "獎盃", "證書", "畢業紀念冊", "舊照片", "情書", "日記本", "樂譜", "劇本", "手稿", "畫筆", "調色盤", "雕刻刀", "陶土", "毛線球", "針線包", "裁縫剪刀", "頂針", "量尺"]),
+      habitAction: sample(["摸下巴", "轉筆", "敲手指", "抖腳", "咬指甲", "玩頭髮", "撥頭髮", "推眼鏡", "咬嘴唇", "舔嘴唇", "抿嘴", "皺眉", "挑眉", "聳肩", "攤手", "雙手抱胸", "雙手插腰", "雙手插口袋", "摸鼻子", "摸耳朵", "抓後頸", "搓手", "掰手指關節", "點頭", "搖頭", "歪頭", "瞇眼", "眨眼", "眼神飄移", "避免眼神接觸", "直視對方眼睛", "說話時加上很多手勢", "說話時音調會變高", "說話時會結巴", "說話時會重複某些詞", "口頭禪", "嘆氣", "清喉嚨", "吹口哨", "哼歌", "磨牙", "打哈欠", "伸懶腰", "駝背", "站三七步", "走路外八", "走路內八", "走路很快", "走路很慢", "坐下時會盤腿", "坐下時會翹腳", "喜歡靠著牆", "喜歡坐在角落", "喜歡靠窗的位置", "吃飯很快", "吃飯很慢", "喝水前會先聞一下", "喝湯會發出聲音", "寫字很用力", "寫字很輕", "喜歡用特定顏色的筆", "喜歡在書上畫線", "喜歡摺書角", "看書會默念", "聽音樂會跟著打拍子", "看電影會自言自語", "講電話時會來回踱步", "緊張時會冒汗", "說謊時不敢看人", "開心時會跳起來", "難過時會吃甜食", "生氣時會沉默", "思考時會看天花板", "專心時會不自覺伸出舌頭", "習慣性遲到", "習慣性早到", "凡事都要規劃好", "喜歡即興發揮", "東西一定要擺整齊", "東西亂中有序", "睡前一定要看書", "睡前一定要滑手機", "起床第一件事是喝水", "起床第一件事是看手機", "出門前一定要照鏡子", "回家第一件事是洗手", "購物前會列清單", "喜歡收集發票", "喜歡對發票", "走路喜歡靠左邊", "走路喜歡靠右邊", "搭手扶梯習慣站左邊", "搭手扶梯習慣站右邊", "講話喜歡中英夾雜", "喜歡用很多表情符號", "喜歡用貼圖", "喜歡已讀不回", "喜歡秒讀秒回"]),
+      prayerContent: "" 
+    };
+}
+
+// ** 新增 **：渲染單張卡片的函式
+function renderCard(character, isSaved = false) {
+    const container = document.querySelector(".container");
+    const card = document.createElement("div");
+    card.className = "character-card";
+    card.dataset.id = character.id;
+
+    const isCollapsed = !isSaved;
+    if (isCollapsed) {
+        card.classList.add('collapsed');
+    }
+    const toggleButtonText = isCollapsed ? '展開' : '收合';
+
+    let buttonsHtml = '';
+    if (isSaved) {
+        buttonsHtml = `<button class="delete-btn">刪除</button>`;
+    } else {
+        buttonsHtml = `<button class="save-btn">儲存此人物</button>`;
+    }
+
+    card.innerHTML = `
+        <div class="card-actions">
+            <button class="copy-btn">複製資訊</button>
+            <button class="toggle-collapse-btn">${toggleButtonText}</button>
+            <button class="generate-prayer-btn">生成禱告</button> ${buttonsHtml}
+        </div>
+        <div class="category-title">個人資訊</div>
+        <strong>姓名</strong>：${character.chineseName}<br>
+        <strong>電子信箱前綴</strong>：<input type="text" class="editable-field" value="${character.emailPrefix}" data-field="emailPrefix"><br>
+        <strong>中文暱稱</strong>：<input type="text" class="editable-field" value="${character.nickname}" data-field="nickname"><br>
+        <strong>喜愛的經文</strong>：${character.favoriteVerse}<br>
+        <div class="collapsible-content">
+            <strong>英文名</strong>：${character.englishName}<br>
+            <strong>性別</strong>：${character.gender}<br>
+            <strong>生日</strong>：${character.birthday}<br>
+            <strong>居住地點</strong>：${character.location}<br>
+            <strong>交通工具</strong>：${character.transportation}<br>
+            <strong>健康狀況</strong>：${character.healthCondition}<br>
+
+            <div class="category-title">家庭</div>
+            <strong>婚姻狀態</strong>：${character.maritalStatus}<br>
+            ${character.spouseName ? 
+              `<strong>另一半姓名</strong>：${character.spouseName}<br>
+               <strong>配偶年齡</strong>：${character.spouseAge}<br>` 
+              : ''
+            }
+            ${character.children.length > 0 ? 
+              `<strong>子女人數</strong>：${character.children.length}<br>` + 
+              character.children.map(child => `&nbsp;&nbsp;• ${child.name} (${child.age}歲)`).join('<br>') + '<br>'
+              : ''
+            }
+            <strong>家庭背景</strong>：${character.familyBackground}<br>
+
+            <div class="category-title">學歷與職業</div>
+            <strong>學歷</strong>：${character.education}<br>
+            <strong>職業</strong>：${character.occupation}<br>
+            <strong>經濟狀況</strong>：${character.financialStatus}<br>
+            <strong>對未來規劃</strong>：${character.futurePlan}<br>
+            <strong>人生目標</strong>：${character.lifeGoal}<br>
+
+            <div class="category-title">角色故事與特質</div>
+            <strong>背景故事</strong>：${character.story}<br>
+            <strong>一個秘密</strong>：${character.secret}<br>
+            <strong>優點</strong>：${character.strengths}<br>
+            <strong>缺點</strong>：${character.weaknesses}<br>
+            <strong>生活習慣</strong>：${character.lifestyle}<br>
+            <strong>興趣嗜好</strong>：${character.hobbies}<br>
+            <strong>代表性物品</strong>：${character.symbolicItem}<br>
+            <strong>習慣動作</strong>：${character.habitAction}<br>
+
+            <div class="category-title">信仰生活</div>
+            <strong>宗派</strong>：${character.denomination}<br>
+            <strong>教會崗位</strong>：${character.churchRole}<br>
+            <strong>屬靈恩賜</strong>：${character.spiritualGift}<br>
+
+            <div class="category-title">社交與價值觀</div>
+            <strong>政治立場</strong>：${character.politicalView}<br>
+            <strong>消費觀念</strong>：${character.consumptionConcept}<br>
+            <strong>人生觀</strong>：${character.lifeView}<br>
+            <strong>願望</strong>：${character.wish}<br>
+            <strong>社群偏好</strong>：${character.socialMedia}<br>
+            <strong>人際交往風格</strong>：${character.socialStyle}<br>
+            <strong>學習風格</strong>：${character.learningStyle}<br>
+            <strong>思維模式</strong>：${character.thinkingMode}<br>
+            <strong>情緒管理方式</strong>：${character.emotionManagement}<br>
+            <strong>幽默感類型</strong>：${character.humorType}<br>
+            <strong>社會議題關注</strong>：${character.socialConcern}<br>
+            <strong>休閒娛樂深度</strong>：${character.leisureDepth}<br>
+        </div>
+        <div class="category-title" style="margin-top: 20px;">AI 生成禱告文</div>
+        <div class="prayer-content-box" data-field="prayerContent">
+            ${character.prayerContent || '點擊「生成禱告」按鈕，讓 AI 為這個人物寫出禱告文。'}
+        </div>
+    `;
+
+    if (isSaved) {
+        container.appendChild(card);
+    } else {
+        container.prepend(card);
+    }
+
+    card.querySelectorAll('.editable-field').forEach(input => {
+        input.addEventListener('input', (e) => {
+            updateDisplayedCharacter(character.id, e.target.dataset.field, e.target.value);
+        });
     });
+
+    const toggleBtn = card.querySelector('.toggle-collapse-btn');
+    toggleBtn.addEventListener('click', () => {
+        card.classList.toggle('collapsed');
+        toggleBtn.textContent = card.classList.contains('collapsed') ? '展開' : '收合';
+    });
+    
+    const copyBtn = card.querySelector('.copy-btn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => copyCharacterInfo(character.id));
+    }
+
+    if (isSaved) {
+        card.querySelector('.delete-btn').addEventListener('click', () => deleteCharacter(character.id));
+    } else {
+        card.querySelector('.save-btn').addEventListener('click', (e) => saveCharacter(character.id, e.target));
+    }
+
+    // New event listener for the generate prayer button
+    const generatePrayerBtn = card.querySelector('.generate-prayer-btn');
+    generatePrayerBtn.addEventListener('click', async () => {
+        const prayerBox = card.querySelector('.prayer-content-box');
+        prayerBox.innerHTML = '<span class="prayer-loading">正在生成中，請稍候...</span>';
+        generatePrayerBtn.disabled = true; // Disable button during generation
+        const prayer = await generateSelfPrayerContent(character);
+        prayerBox.textContent = prayer; // Use textContent to prevent XSS
+        character.prayerContent = prayer; // Update character object
+        updateDisplayedCharacter(character.id, 'prayerContent', prayer); // Save to local storage if it's a saved character
+        generatePrayerBtn.disabled = false; // Re-enable button
+    });
+}
+
+// ** 已修改 **：複製所有資訊 (包含禱告文)
+function copyCharacterInfo(characterId) {
+    const character = displayedCharacters.find(char => char.id == characterId);
+    if (!character) return;
+
+    // 建立一個包含所有資訊的文字字串
+    let textToCopy = `個人資訊
+    姓名：${character.chineseName}
+    電子信箱前綴：${character.emailPrefix}
+    中文暱稱：${character.nickname}
+    喜愛的經文：${character.favoriteVerse}
+    英文名：${character.englishName}
+    性別：${character.gender}
+    生日：${character.birthday}
+    居住地點：${character.location}
+    交通工具：${character.transportation}
+    健康狀況：${character.healthCondition}
+
+    家庭
+    婚姻狀態：${character.maritalStatus}
+    ${character.spouseName ? `另一半姓名：${character.spouseName}\n配偶年齡：${character.spouseAge}\n` : ''}${character.children.length > 0 ? `子女人數：${character.children.length}\n` + character.children.map(child => ` • ${child.name} (${child.age}歲)`).join('\n') + '\n' : ''}家庭背景：${character.familyBackground}
+
+    學歷與職業
+    學歷：${character.education}
+    職業：${character.occupation}
+    經濟狀況：${character.financialStatus}
+    對未來規劃：${character.futurePlan}
+    人生目標：${character.lifeGoal}
+
+    角色故事與特質
+    背景故事：${character.story}
+    一個秘密：${character.secret}
+    優點：${character.strengths}
+    缺點：${character.weaknesses}
+    生活習慣：${character.lifestyle}
+    興趣嗜好：${character.hobbies}
+    代表性物品：${character.symbolicItem}
+    習慣動作：${character.habitAction}
+
+    信仰生活
+    宗派：${character.denomination}
+    教會崗位：${character.churchRole}
+    屬靈恩賜：${character.spiritualGift}
+
+    社交與價值觀
+    政治立場：${character.politicalView}
+    消費觀念：${character.consumptionConcept}
+    人生觀：${character.lifeView}
+    願望：${character.wish}
+    社群偏好：${character.socialMedia}
+    人際交往風格：${character.socialStyle}
+    學習風格：${character.learningStyle}
+    思維模式：${character.thinkingMode}
+    情緒管理方式：${character.emotionManagement}
+    幽默感類型：${character.humorType}
+    社會議題關注：${character.socialConcern}
+    休閒娛樂深度：${character.leisureDepth}
+
+    AI 生成禱告文:
+    ${character.prayerContent || '尚未生成禱告內容。'}`; // Include prayer content
+
+    const textArea = document.createElement("textarea");
+    textArea.value = textToCopy.trim();
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        const copyBtn = document.querySelector(`[data-id='${characterId}'] .copy-btn`);
+        if(copyBtn) {
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '已複製!';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('無法複製文字: ', err);
+    }
+    document.body.removeChild(textArea);
+}
+
+
+function updateDisplayedCharacter(characterId, field, value) {
+    const character = displayedCharacters.find(char => char.id == characterId);
+    if (character) {
+        character[field] = value;
+        
+        // Only update local storage if the character is saved
+        const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        const charIndex = savedCharacters.findIndex(char => char.id == characterId);
+        if (charIndex > -1) {
+            savedCharacters[charIndex][field] = value;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+        }
+    }
+}
+
+function saveCharacter(characterId, button) {
+    const characterToSave = displayedCharacters.find(char => char.id == characterId);
+    if (!characterToSave) return;
+
+    const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    if (!savedCharacters.some(char => char.id === characterId)) {
+        savedCharacters.push(characterToSave);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+
+        // Update the card visually to reflect saved state
+        const card = document.querySelector(`[data-id='${characterId}']`);
+        if (card) {
+            const saveBtnContainer = card.querySelector('.card-actions');
+            let deleteBtn = card.querySelector('.delete-btn');
+            if (!deleteBtn) { // If delete button doesn't exist, create it
+                deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.textContent = '刪除';
+                saveBtnContainer.appendChild(deleteBtn);
+            }
+            deleteBtn.addEventListener('click', () => deleteCharacter(characterId));
+
+            button.remove(); // Remove the "Save this character" button
+        }
+    }
+}
+
+
+function deleteCharacter(characterId) {
+    let savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    savedCharacters = savedCharacters.filter(char => char.id != characterId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+
+    displayedCharacters = displayedCharacters.filter(char => char.id != characterId);
+
+    const cardToRemove = document.querySelector(`[data-id='${characterId}']`);
+    if (cardToRemove) {
+        cardToRemove.remove();
+    }
+}
+
+function loadSavedCharacters() {
+    const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    displayedCharacters = [...savedCharacters];
+    document.querySelector('.container').innerHTML = '';
+    if (displayedCharacters.length === 0) {
+        document.querySelector('.container').innerHTML = '<p style="text-align: center; color: #666; font-size: 1.1em;">目前沒有儲存的人物，點擊上方「✨ 生成新人物」開始創建吧！</p>';
+    } else {
+        displayedCharacters.forEach(character => renderCard(character, true));
+    }
+}
+
+function exportCharacters() {
+    const savedCharacters = localStorage.getItem(STORAGE_KEY);
+    if (!savedCharacters || savedCharacters === '[]') {
+        const btn = document.getElementById('exportBtn');
+        const originalText = btn.textContent;
+        btn.textContent = '沒有可匯出的資料!';
+        setTimeout(() => { btn.textContent = originalText; }, 2000);
+        return;
+    }
+    const blob = new Blob([savedCharacters], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'characters_save.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function importCharacters(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (Array.isArray(importedData)) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+                loadSavedCharacters();
+                const btn = document.getElementById('importBtn');
+                const originalText = btn.textContent;
+                btn.textContent = '匯入成功!';
+                setTimeout(() => { btn.textContent = originalText; }, 2000);
+            } else {
+                throw new Error("Invalid file format.");
+            }
+        } catch (error) {
+            console.error("匯入失敗:", error);
+            const btn = document.getElementById('importBtn');
+            const originalText = btn.textContent;
+            btn.textContent = '檔案格式錯誤!';
+            setTimeout(() => { btn.textContent = originalText; }, 2000);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// --- NEW FUNCTION: Generate prayer content using Gemini API ---
+// public/index.html 中的 <script> 標籤內
+async function generateSelfPrayerContent(characterData) {
+  try {
+    // 將請求發送到我們的 Cloud Function，它的名字叫 generateprayer
+    // 注意：部署後，Firebase 會自動處理這個路徑
+    const response = await fetch('/generateprayer', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(characterData),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("後端函式回傳錯誤:", data.error);
+      return `生成失敗：${data.error || '未知錯誤'}`;
+    }
+
+    return data.prayer;
+
+  } catch (error) {
+    console.error("呼叫後端函式失敗:", error);
+    return "無法連接到後端，請檢查網路。";
+  }
+}
+
+// --- 事件綁定 ---
+document.getElementById("generateBtn").addEventListener("click", () => {
+    const character = generateRandomCharacter();
+    displayedCharacters.push(character);
+    renderCard(character, false);
+});
+
+// ** 新增 **：指定人物生成按鈕事件
+document.getElementById("specificGenerateBtn").addEventListener("click", () => {
+    const character = generateRandomCharacter(true);
+    displayedCharacters.push(character);
+    renderCard(character, false);
+});
+
+document.getElementById('exportBtn').addEventListener('click', exportCharacters);
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', importCharacters);
+
+window.addEventListener('load', loadSavedCharacters);
+
 </script>
 </body>
 </html>
