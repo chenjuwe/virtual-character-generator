@@ -229,6 +229,32 @@ function generateRandomCharacter() {
     };
 }
 
+// **新增**: 通用的複製文字到剪貼簿函式
+function copyTextToClipboard(text, buttonElement) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    // 讓 textarea 在畫面外，避免閃爍
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-9999px';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        if (buttonElement) {
+            const originalText = buttonElement.textContent;
+            buttonElement.textContent = '已複製!';
+            setTimeout(() => {
+                buttonElement.textContent = originalText;
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('無法複製文字: ', err);
+    }
+    document.body.removeChild(textArea);
+}
+
+
 function renderPrayerList(container, character) {
     const prayers = character.prayers || [];
     container.innerHTML = ''; 
@@ -265,24 +291,7 @@ function renderPrayerList(container, character) {
         container.appendChild(prayerItem);
 
         const copyBtn = prayerItem.querySelector('.prayer-copy-btn');
-        copyBtn.addEventListener('click', () => {
-            const textToCopy = prayer.text;
-            const textArea = document.createElement("textarea");
-            textArea.value = textToCopy;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = '已複製!';
-                setTimeout(() => {
-                    copyBtn.textContent = originalText;
-                }, 2000);
-            } catch (err) {
-                console.error('無法複製禱告文: ', err);
-            }
-            document.body.removeChild(textArea);
-        });
+        copyBtn.addEventListener('click', () => copyTextToClipboard(prayer.text, copyBtn));
 
         const usedBtn = prayerItem.querySelector('.prayer-used-btn');
         usedBtn.addEventListener('click', () => {
@@ -303,7 +312,7 @@ function renderCard(character, isSaved = false) {
     card.className = "character-card";
     card.dataset.id = character.id;
 
-    const isCollapsed = !isSaved;
+    const isCollapsed = true; 
     if (isCollapsed) {
         card.classList.add('collapsed');
     }
@@ -316,6 +325,7 @@ function renderCard(character, isSaved = false) {
         buttonsHtml = `<button class="save-btn" aria-label="儲存此人物">儲存此人物</button>`;
     }
 
+    // **修改**: 更新所有個人資訊的標籤為四個字
     card.innerHTML = `
         <div class="card-actions">
             <button class="copy-btn" aria-label="複製資訊">複製資訊</button>
@@ -324,14 +334,25 @@ function renderCard(character, isSaved = false) {
             ${buttonsHtml}
         </div>
         <div class="category-title">個人資訊</div>
-        <strong>姓名</strong>：${character.chineseName}<br>
-        <strong>電子信箱前綴</strong>：<input type="text" class="editable-field" value="${character.emailPrefix}" data-field="emailPrefix"><br>
-        <strong>中文暱稱</strong>：<input type="text" class="editable-field" value="${character.nickname}" data-field="nickname"><br>
-        <strong>喜愛的經文</strong>：${character.favoriteVerse}<br>
+        <strong>中文姓名</strong>：${character.chineseName}<br>
+        
+        <div class="field-container">
+            <span><strong>信箱前綴</strong>：<input type="text" class="editable-field" value="${character.emailPrefix}" data-field="emailPrefix" id="email-${character.id}"></span>
+            <button class="field-copy-btn" data-copy-target="email-${character.id}" data-copy-type="input">複製</button>
+        </div>
+        <div class="field-container">
+            <span><strong>中文暱稱</strong>：<input type="text" class="editable-field" value="${character.nickname}" data-field="nickname" id="nickname-${character.id}"></span>
+            <button class="field-copy-btn" data-copy-target="nickname-${character.id}" data-copy-type="input">複製</button>
+        </div>
+        <div class="field-container">
+            <span><strong>喜愛經文</strong>：${character.favoriteVerse}</span>
+            <button class="field-copy-btn" data-copy-text="${character.favoriteVerse}" data-copy-type="text">複製</button>
+        </div>
+
         <div class="collapsible-content">
-            <strong>英文名</strong>：${character.englishName}<br>
-            <strong>性別</strong>：${character.gender}<br>
-            <strong>生日</strong>：${character.birthday}<br>
+            <strong>英文姓名</strong>：${character.englishName}<br>
+            <strong>生理性別</strong>：${character.gender}<br>
+            <strong>出生日期</strong>：${character.birthday}<br>
             <strong>居住地點</strong>：${character.location}<br>
             <strong>交通工具</strong>：${character.transportation}<br>
             <strong>健康狀況</strong>：${character.healthCondition}<br>
@@ -351,40 +372,40 @@ function renderCard(character, isSaved = false) {
             <strong>家庭背景</strong>：${character.familyBackground}<br>
 
             <div class="category-title">學歷與職業</div>
-            <strong>學歷</strong>：${character.education}<br>
-            <strong>職業</strong>：${character.occupation}<br>
+            <strong>最高學歷</strong>：${character.education}<br>
+            <strong>最新職業</strong>：${character.occupation}<br>
             <strong>經濟狀況</strong>：${character.financialStatus}<br>
-            <strong>對未來規劃</strong>：${character.futurePlan}<br>
+            <strong>未來規劃</strong>：${character.futurePlan}<br>
             <strong>人生目標</strong>：${character.lifeGoal}<br>
 
             <div class="category-title">角色故事與特質</div>
             <strong>背景故事</strong>：${character.story}<br>
             <strong>一個秘密</strong>：${character.secret}<br>
-            <strong>優點</strong>：${character.strengths}<br>
-            <strong>缺點</strong>：${character.weaknesses}<br>
+            <strong>個人優點</strong>：${character.strengths}<br>
+            <strong>個人缺點</strong>：${character.weaknesses}<br>
             <strong>生活習慣</strong>：${character.lifestyle}<br>
             <strong>興趣嗜好</strong>：${character.hobbies}<br>
-            <strong>代表性物品</strong>：${character.symbolicItem}<br>
+            <strong>代表物品</strong>：${character.symbolicItem}<br>
             <strong>習慣動作</strong>：${character.habitAction}<br>
 
             <div class="category-title">信仰生活</div>
-            <strong>宗派</strong>：${character.denomination}<br>
+            <strong>信仰派別</strong>：${character.denomination}<br>
             <strong>教會崗位</strong>：${character.churchRole}<br>
             <strong>屬靈恩賜</strong>：${character.spiritualGift}<br>
 
             <div class="category-title">社交與價值觀</div>
             <strong>政治立場</strong>：${character.politicalView}<br>
             <strong>消費觀念</strong>：${character.consumptionConcept}<br>
-            <strong>人生觀</strong>：${character.lifeView}<br>
-            <strong>願望</strong>：${character.wish}<br>
+            <strong>人生觀念</strong>：${character.lifeView}<br>
+            <strong>目標願望</strong>：${character.wish}<br>
             <strong>社群偏好</strong>：${character.socialMedia}<br>
-            <strong>人際交往風格</strong>：${character.socialStyle}<br>
+            <strong>人際關係</strong>：${character.socialStyle}<br>
             <strong>學習風格</strong>：${character.learningStyle}<br>
             <strong>思維模式</strong>：${character.thinkingMode}<br>
-            <strong>情緒管理方式</strong>：${character.emotionManagement}<br>
-            <strong>幽默感類型</strong>：${character.humorType}<br>
-            <strong>社會議題關注</strong>：${character.socialConcern}<br>
-            <strong>休閒娛樂深度</strong>：${character.leisureDepth}<br>
+            <strong>情緒管理</strong>：${character.emotionManagement}<br>
+            <strong>幽默類型</strong>：${character.humorType}<br>
+            <strong>議題關注</strong>：${character.socialConcern}<br>
+            <strong>休閒娛樂</strong>：${character.leisureDepth}<br>
         </div>
         <div class="category-title" style="margin-top: 20px;">AI 生成禱告文</div>
         <div class="prayer-content-box">
@@ -453,6 +474,28 @@ function renderCard(character, isSaved = false) {
             generatePrayerBtn.disabled = false;
         }
     });
+
+    card.querySelectorAll('.field-copy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const button = e.currentTarget;
+            const copyType = button.dataset.copyType;
+            let textToCopy = '';
+
+            if (copyType === 'input') {
+                const targetId = button.dataset.copyTarget;
+                const inputElement = card.querySelector(`#${targetId}`);
+                if (inputElement) {
+                    textToCopy = inputElement.value;
+                }
+            } else if (copyType === 'text') {
+                textToCopy = button.dataset.copyText;
+            }
+            
+            if (textToCopy) {
+                copyTextToClipboard(textToCopy, button);
+            }
+        });
+    });
 }
 
 function copyCharacterInfo(characterId) {
@@ -469,14 +512,15 @@ function copyCharacterInfo(characterId) {
         }).join('\n\n');
     }
 
+    // **修改**: 更新複製文字中的標籤
     let textToCopy = `個人資訊
-姓名：${character.chineseName}
-電子信箱前綴：${character.emailPrefix}
+中文姓名：${character.chineseName}
+信箱前綴：${character.emailPrefix}
 中文暱稱：${character.nickname}
-喜愛的經文：${character.favoriteVerse}
-英文名：${character.englishName}
-性別：${character.gender}
-生日：${character.birthday}
+喜愛經文：${character.favoriteVerse}
+英文姓名：${character.englishName}
+生理性別：${character.gender}
+出生日期：${character.birthday}
 居住地點：${character.location}
 交通工具：${character.transportation}
 健康狀況：${character.healthCondition}
@@ -486,62 +530,45 @@ function copyCharacterInfo(characterId) {
 ${character.spouseName ? `另一半姓名：${character.spouseName}\n配偶年齡：${character.spouseAge}\n` : ''}${character.children.length > 0 ? `子女人數：${character.children.length}\n` + character.children.map(child => ` • ${child.name} (${child.age}歲)`).join('\n') + '\n' : ''}家庭背景：${character.familyBackground}
 
 學歷與職業
-學歷：${character.education}
-職業：${character.occupation}
+最高學歷：${character.education}
+最新職業：${character.occupation}
 經濟狀況：${character.financialStatus}
-對未來規劃：${character.futurePlan}
+未來規劃：${character.futurePlan}
 人生目標：${character.lifeGoal}
 
 角色故事與特質
 背景故事：${character.story}
 一個秘密：${character.secret}
-優點：${character.strengths}
-缺點：${character.weaknesses}
+個人優點：${character.strengths}
+個人缺點：${character.weaknesses}
 生活習慣：${character.lifestyle}
 興趣嗜好：${character.hobbies}
-代表性物品：${character.symbolicItem}
+代表物品：${character.symbolicItem}
 習慣動作：${character.habitAction}
 
 信仰生活
-宗派：${character.denomination}
+信仰派別：${character.denomination}
 教會崗位：${character.churchRole}
 屬靈恩賜：${character.spiritualGift}
 
 社交與價值觀
 政治立場：${character.politicalView}
 消費觀念：${character.consumptionConcept}
-人生觀：${character.lifeView}
-願望：${character.wish}
+人生觀念：${character.lifeView}
+目標願望：${character.wish}
 社群偏好：${character.socialMedia}
-人際交往風格：${character.socialStyle}
+人際關係：${character.socialStyle}
 學習風格：${character.learningStyle}
 思維模式：${character.thinkingMode}
-情緒管理方式：${character.emotionManagement}
-幽默感類型：${character.humorType}
-社會議題關注：${character.socialConcern}
-休閒娛樂深度：${character.leisureDepth}
+情緒管理：${character.emotionManagement}
+幽默類型：${character.humorType}
+議題關注：${character.socialConcern}
+休閒娛樂：${character.leisureDepth}
 
 AI 生成禱告文:
 ${prayersToCopy}`;
 
-    const textArea = document.createElement("textarea");
-    textArea.value = textToCopy.trim();
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-        document.execCommand('copy');
-        const copyBtn = document.querySelector(`[data-id='${characterId}'] .copy-btn`);
-        if (copyBtn) {
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = '已複製!';
-            setTimeout(() => {
-                copyBtn.textContent = originalText;
-            }, 2000);
-        }
-    } catch (err) {
-        console.error('無法複製文字: ', err);
-    }
-    document.body.removeChild(textArea);
+    copyTextToClipboard(textToCopy.trim(), document.querySelector(`[data-id='${characterId}'] .copy-btn`));
 }
 
 function updateDisplayedCharacter(characterId, field, value) {
@@ -585,7 +612,6 @@ function saveCharacter(characterId, button) {
     }
 }
 
-// **優化**: 使用自訂對話框取代 confirm()
 function deleteCharacter(characterId) {
     const modal = document.getElementById('customConfirmModal');
     const confirmBtn = document.getElementById('modalConfirmBtn');

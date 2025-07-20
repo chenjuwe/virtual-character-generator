@@ -114,6 +114,35 @@ header button:hover {
     color: #666;
 }
 
+/* **新增**: 欄位容器和複製按鈕樣式 */
+.field-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    /* 確保容器本身有足夠的空間，但移除其內部的 line-height 影響 */
+    line-height: 1.2; 
+    padding: 4px 0; /* 增加上下間距 */
+}
+.field-container span {
+    /* 讓 span 內的文字恢復正常的行高 */
+    line-height: 1.8; 
+}
+.field-copy-btn {
+    background-color: #e0e0e0;
+    color: #333;
+    border: none;
+    border-radius: 0;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 10px; /* 與左側內容的間距 */
+    transition: background-color 0.2s;
+}
+.field-copy-btn:hover {
+    background-color: #bdbdbd;
+}
+
+
 /* 響應式設計 (RWD) */
 @media (max-width: 768px) {
     body {
@@ -125,6 +154,14 @@ header button:hover {
     }
     .editable-field {
         width: 100%;
+    }
+    .field-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .field-copy-btn {
+        margin-left: 0;
+        margin-top: 4px;
     }
 }
 
@@ -167,7 +204,7 @@ header button:hover {
 .prayer-used-btn {
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 2px 8px;
     font-size: 11px;
     cursor: pointer;
@@ -197,7 +234,7 @@ header button:hover {
     color: #d32f2f;
 }
 
-/* **新增**：自訂對話框樣式 */
+/* 自訂對話框樣式 */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -220,7 +257,7 @@ header button:hover {
 .modal-content {
     background-color: #fff;
     padding: 25px 30px;
-    border-radius: 8px;
+    border-radius: 0;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     text-align: center;
     max-width: 90%;
@@ -244,7 +281,7 @@ header button:hover {
 .modal-btn {
     border: none;
     padding: 10px 20px;
-    border-radius: 5px;
+    border-radius: 0;
     font-size: 14px;
     cursor: pointer;
     transition: opacity 0.2s;
