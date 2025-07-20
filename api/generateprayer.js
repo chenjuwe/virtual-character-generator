@@ -16,6 +16,11 @@ export default async function handler(request, response) {
   try {
     const characterData = request.body; // 取得從前端傳來的角色資料
 
+    // **新增**：後端輸入驗證
+    if (!characterData || !characterData.chineseName || !characterData.wish) {
+      return response.status(400).json({ error: 'Bad Request: Missing required character data.' });
+    }
+
     // 取得生成模型
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 

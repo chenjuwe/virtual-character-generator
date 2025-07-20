@@ -1,7 +1,11 @@
-// **新增**：從 database.js 匯入所有資料
 import * as db from './database.js';
 
-const STORAGE_KEY = 'savedChristianCharacters';
+// **優化**: 使用常數管理重複字串
+const CONSTANTS = {
+  STORAGE_KEY: 'savedChristianCharacters',
+  PRAYER_USED_CLASS: 'used'
+};
+
 let displayedCharacters = [];
 
 // Helper function: Debounce for performance optimization
@@ -102,63 +106,7 @@ function generateGmailPrefix(englishName, birthYear) {
 }
 
 
-function generateRandomCharacter(isSpecific = false) {
-    const specificCharacterData = {
-        chineseName: "孫珊",
-        englishName: "Shan Sun",
-        gender: "女性",
-        birthday: "1982-07-14 (43歲)",
-        location: "桃園",
-        transportation: "光陽 GP125",
-        healthCondition: "高血壓",
-        maritalStatus: "離婚",
-        familyBackground: "單親家庭",
-        education: "高中畢業",
-        occupation: "木工",
-        financialStatus: "中等收入",
-        futurePlan: "深造",
-        lifeGoal: "幫助他人",
-        story: "計畫在五年內環遊世界",
-        secret: "偷偷養了一隻寵物",
-        strengths: "創造力",
-        weaknesses: "健忘",
-        lifestyle: "早睡早起",
-        hobbies: "烹飪",
-        symbolicItem: "鋼筆",
-        habitAction: "敲手指",
-        denomination: "靈恩派",
-        churchRole: "宣教士",
-        favoriteVerse: "「愛是恆久忍耐，又有恩慈。」(林前 13:4)",
-        spiritualGift: "教導",
-        politicalView: "中立",
-        consumptionConcept: "極簡主義",
-        lifeView: "盡力而為",
-        wish: "財富自由",
-        socialMedia: "LinkedIn",
-        socialStyle: "外向",
-        learningStyle: "聽覺學習",
-        thinkingMode: "感性思維",
-        emotionManagement: "運動",
-        humorType: "自嘲型",
-        socialConcern: "動物權益",
-        leisureDepth: "深層沉浸",
-        children: [{ name: "孫小花", age: 10 }],
-        spouseName: null,
-        spouseAge: null,
-    };
-
-    if (isSpecific) {
-        const emailPrefix = generateGmailPrefix(specificCharacterData.englishName, "1982");
-        return {
-            ...specificCharacterData,
-            id: Date.now() + Math.random(),
-            nickname: sample(db.christianNicknames),
-            emailPrefix: emailPrefix,
-            prayers: [] 
-        };
-    }
-
-
+function generateRandomCharacter() {
     const gender = sample(["男性", "女性"]);
     const baseName = generateChineseNameWithPinyin();
 
@@ -281,11 +229,11 @@ function generateRandomCharacter(isSpecific = false) {
     };
 }
 
-// **修改**: 專門用來渲染禱告列表的輔助函式
-function renderPrayerList(container, prayers) {
+function renderPrayerList(container, character) {
+    const prayers = character.prayers || [];
     container.innerHTML = ''; 
 
-    if (!prayers || prayers.length === 0) {
+    if (prayers.length === 0) {
         container.innerHTML = '點擊「生成禱告」按鈕，讓 AI 為這個人物寫出禱告文。';
         return;
     }
@@ -304,17 +252,18 @@ function renderPrayerList(container, prayers) {
             minute: '2-digit'
         });
 
-        // **修改**: 加入複製按鈕
         prayerItem.innerHTML = `
             <div class="prayer-header">
                 <div class="prayer-timestamp">${prayerDate}</div>
-                <button class="prayer-copy-btn">複製</button>
+                <div class="prayer-buttons">
+                    <button class="prayer-used-btn">${prayer.isUsed ? '取消使用' : '標為已用'}</button>
+                    <button class="prayer-copy-btn">複製</button>
+                </div>
             </div>
-            <div class="prayer-text">${prayer.text}</div>
+            <div class="prayer-text ${prayer.isUsed ? CONSTANTS.PRAYER_USED_CLASS : ''}">${prayer.text}</div>
         `;
         container.appendChild(prayerItem);
 
-        // **新增**: 為複製按鈕綁定事件
         const copyBtn = prayerItem.querySelector('.prayer-copy-btn');
         copyBtn.addEventListener('click', () => {
             const textToCopy = prayer.text;
@@ -331,15 +280,23 @@ function renderPrayerList(container, prayers) {
                 }, 2000);
             } catch (err) {
                 console.error('無法複製禱告文: ', err);
-                alert('複製失敗，您的瀏覽器可能不支援此功能。');
             }
             document.body.removeChild(textArea);
+        });
+
+        const usedBtn = prayerItem.querySelector('.prayer-used-btn');
+        usedBtn.addEventListener('click', () => {
+            const prayerToUpdate = character.prayers.find(p => p.timestamp === prayer.timestamp);
+            if (prayerToUpdate) {
+                prayerToUpdate.isUsed = !prayerToUpdate.isUsed;
+                updateDisplayedCharacter(character.id, 'prayers', character.prayers);
+                renderPrayerList(container, character);
+            }
         });
     });
 }
 
 
-// 渲染單張卡片的函式
 function renderCard(character, isSaved = false) {
     const container = document.querySelector(".container");
     const card = document.createElement("div");
@@ -435,7 +392,7 @@ function renderCard(character, isSaved = false) {
     `;
     
     const prayerBox = card.querySelector('.prayer-content-box');
-    renderPrayerList(prayerBox, character.prayers);
+    renderPrayerList(prayerBox, character);
 
 
     if (isSaved) {
@@ -479,7 +436,7 @@ function renderCard(character, isSaved = false) {
         try {
             const prayerText = await generateSelfPrayerContent(character);
             
-            const newPrayer = { text: prayerText, timestamp: Date.now() };
+            const newPrayer = { text: prayerText, timestamp: Date.now(), isUsed: false };
             if (!character.prayers) { 
                 character.prayers = [];
             }
@@ -487,7 +444,7 @@ function renderCard(character, isSaved = false) {
             
             updateDisplayedCharacter(character.id, 'prayers', character.prayers); 
             
-            renderPrayerList(prayerBox, character.prayers);
+            renderPrayerList(prayerBox, character);
 
         } catch (error) {
             prayerBox.textContent = `生成失敗：${error.message || '未知錯誤'}`;
@@ -507,7 +464,8 @@ function copyCharacterInfo(characterId) {
         const sortedPrayers = character.prayers.slice().sort((a, b) => b.timestamp - a.timestamp);
         prayersToCopy = sortedPrayers.map(p => {
             const prayerDate = new Date(p.timestamp).toLocaleString('zh-TW');
-            return `[${prayerDate}]\n${p.text}`;
+            const usedStatus = p.isUsed ? ' (已使用)' : '';
+            return `[${prayerDate}]${usedStatus}\n${p.text}`;
         }).join('\n\n');
     }
 
@@ -591,11 +549,11 @@ function updateDisplayedCharacter(characterId, field, value) {
     if (character) {
         character[field] = value;
 
-        const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        const savedCharacters = JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY)) || [];
         const charIndex = savedCharacters.findIndex(char => char.id == characterId);
         if (charIndex > -1) {
             savedCharacters[charIndex][field] = value;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+            localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(savedCharacters));
         }
     }
 }
@@ -604,10 +562,10 @@ function saveCharacter(characterId, button) {
     const characterToSave = displayedCharacters.find(char => char.id == characterId);
     if (!characterToSave) return;
 
-    const savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const savedCharacters = JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY)) || [];
     if (!savedCharacters.some(char => char.id === characterId)) {
         savedCharacters.push(characterToSave);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(savedCharacters));
 
         const card = document.querySelector(`[data-id='${characterId}']`);
         if (card) {
@@ -627,41 +585,61 @@ function saveCharacter(characterId, button) {
     }
 }
 
-
+// **優化**: 使用自訂對話框取代 confirm()
 function deleteCharacter(characterId) {
-    const isConfirmed = confirm("您確定要刪除這個人物嗎？此操作無法復原。");
-    if (!isConfirmed) {
-        return;
-    }
+    const modal = document.getElementById('customConfirmModal');
+    const confirmBtn = document.getElementById('modalConfirmBtn');
+    const cancelBtn = document.getElementById('modalCancelBtn');
 
-    let savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    savedCharacters = savedCharacters.filter(char => char.id != characterId);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+    modal.classList.add('visible');
 
-    displayedCharacters = displayedCharacters.filter(char => char.id != characterId);
+    const handleConfirm = () => {
+        let savedCharacters = JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY)) || [];
+        savedCharacters = savedCharacters.filter(char => char.id != characterId);
+        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(savedCharacters));
 
-    const cardToRemove = document.querySelector(`[data-id='${characterId}']`);
-    if (cardToRemove) {
-        cardToRemove.remove();
-    }
+        displayedCharacters = displayedCharacters.filter(char => char.id != characterId);
+
+        const cardToRemove = document.querySelector(`[data-id='${characterId}']`);
+        if (cardToRemove) {
+            cardToRemove.remove();
+        }
+        closeModal();
+    };
+
+    const closeModal = () => {
+        modal.classList.remove('visible');
+        confirmBtn.removeEventListener('click', handleConfirm);
+        cancelBtn.removeEventListener('click', closeModal);
+    };
+
+    confirmBtn.addEventListener('click', handleConfirm, { once: true });
+    cancelBtn.addEventListener('click', closeModal, { once: true });
 }
 
 function loadSavedCharacters() {
-    let savedCharacters = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let savedCharacters = JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY)) || [];
 
     let needsResave = false;
     savedCharacters.forEach(character => {
         if (character.prayerContent && typeof character.prayerContent === 'string') {
-            character.prayers = [{ text: character.prayerContent, timestamp: Date.now() }];
+            character.prayers = [{ text: character.prayerContent, timestamp: Date.now(), isUsed: false }];
             delete character.prayerContent; 
             needsResave = true;
         } else if (!character.prayers) {
             character.prayers = [];
         }
+
+        character.prayers.forEach(p => {
+            if (p.isUsed === undefined) {
+                p.isUsed = false;
+                needsResave = true;
+            }
+        });
     });
 
     if (needsResave) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedCharacters));
+        localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(savedCharacters));
     }
 
 
@@ -677,7 +655,7 @@ function loadSavedCharacters() {
 }
 
 function exportCharacters() {
-    const savedCharacters = localStorage.getItem(STORAGE_KEY);
+    const savedCharacters = localStorage.getItem(CONSTANTS.STORAGE_KEY);
     if (!savedCharacters || savedCharacters === '[]') {
         const btn = document.getElementById('exportBtn');
         const originalText = btn.textContent;
@@ -709,7 +687,7 @@ function importCharacters(event) {
                      throw new Error("Invalid file content.");
                 }
 
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+                localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(importedData));
                 loadSavedCharacters();
                 
                 const btn = document.getElementById('importBtn');
@@ -721,7 +699,6 @@ function importCharacters(event) {
             }
         } catch (error) {
             console.error("匯入失敗:", error);
-            alert(`匯入失敗：檔案格式錯誤或內容不符！\n${error.message}`);
         } finally {
             event.target.value = '';
         }
@@ -758,12 +735,6 @@ async function generateSelfPrayerContent(characterData) {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById("generateBtn").addEventListener("click", () => {
         const character = generateRandomCharacter();
-        displayedCharacters.push(character);
-        renderCard(character, false);
-    });
-
-    document.getElementById("specificGenerateBtn").addEventListener("click", () => {
-        const character = generateRandomCharacter(true);
         displayedCharacters.push(character);
         renderCard(character, false);
     });
